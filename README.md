@@ -77,6 +77,7 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
 - React queries hydrate these endpoints and merchant the role-based UX stack.
 
 - The frontend is deployed to `https://trainingmanager-frontend.azurewebsites.net` and reads `VITE_API_BASE_URL` from App Service configuration (currently pointing to the backend). Run `npm run build` and deploy `frontend/dist` via a run-from-package zip whenever you change the UI.
+- The frontend now hosts an Express-based server (`server.js`) so `npm start` can serve `dist`. Deploy by running `npm run build`, packaging the entire `frontend/` directory, and running `az webapp deployment source config-zip` (the App Service has `npm start` as its startup command and `WEBSITE_RUN_FROM_PACKAGE=0` so the server can load `package.json`).
 
 ## Azure resource plan
 
