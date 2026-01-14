@@ -9,6 +9,7 @@ declare global {
         email: string;
         name: string;
       };
+      auth?: Record<string, unknown>;
     }
   }
 }

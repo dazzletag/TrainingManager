@@ -43,6 +43,8 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
 - `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` – Azure SQL connection.
 - `PLANDAY_API_URL` & `PLANDAY_API_TOKEN` – used by the background sync job (fetches `/roles` and `/employees`, assumes `id`, `roleId`, `employmentStatus`, etc.).
 - `PLANDAY_SYNC_INTERVAL_MS` – optional override for the sync cadence (default 30 minutes).
+- `AZURE_AUTH_ENABLED` – flip to `true` once the App Service and API have Azure AD/Entra ID integration so the middleware validates bearer tokens issued by Microsoft.
+- `AZURE_TENANT_ID` + `AZURE_CLIENT_ID` – consumed by `azureAuthMiddleware` to confirm the issuer/audience, populate `req.user` with `oid/roles/preferred_username`, and keep fake headers disabled.
 - Secrets belong in Key Vault; the App Service identity can be granted `get`/`list` permissions and the values injected as app settings.
 
 ### Frontend

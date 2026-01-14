@@ -6,6 +6,7 @@ import helmet from "helmet";
 import routes from "./routes";
 import { AppDataSource } from "./db/data-source";
 import { mockAuthMiddleware } from "./middleware/auth";
+import { azureAuthEnabled, azureAuthMiddleware, azureUserMapper } from "./middleware/azureAuth";
 import { syncPlandayData } from "./services/plandaySync";
 
 dotenv.config();
@@ -16,7 +17,12 @@ const port = Number(process.env.PORT ?? 4000);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(mockAuthMiddleware);
+if (azureAuthEnabled) {
+  app.use(azureAuthMiddleware);
+  app.use(azureUserMapper);
+} else {
+  app.use(mockAuthMiddleware);
+}
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/v1", routes);
