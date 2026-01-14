@@ -1,0 +1,433 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Alert,
+  Box,
+  Button,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+  Chip,
+} from "@mui/material";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useUserContext } from "../context/UserContext";
+import {
+  assignPersonToSession,
+  createTrainingSession,
+  fetchSchedulerOverview,
+  publishTrainingSession,
+  removeSessionAssignment,
+} from "../services/api";
+
+type DragPayload = {
+  personId: string;
+  assignmentId?: string;
+  day?: number;
+  source: "unassigned" | "day1" | "day2";
+};
+
+type SessionAssignment = {
+  id: string;
+  dropZoneId: string;
+  person: {
+    id: string;
+    externalId: string;
+    name: string;
+    email: string;
+    role: string;
+    home?: string;
+    status: string;
+  };
+};
+
+type SessionOverview = {
+  id: string;
+  name: string;
+  type: string;
+  day1: string;
+  day2: string;
+  day1Assignments: SessionAssignment[];
+  day2Assignments: SessionAssignment[];
+};
+
+type UnassignedPerson = {
+  id: string;
+  externalId: string;
+  name: string;
+  role: string;
+  home: string;
+  status: string;
+  employmentStatus: string;
+  nextDue?: string;
+  lastTrainingAt?: string;
+};
+
+type PublishFeedback = {
+  results: {
+    personId: string;
+    day: number;
+    moved: boolean;
+    reason?: string;
+  }[];
+  publishedAt: string;
+};
+
+const homePalette = ["#e3f2fd", "#f3e5f5", "#e8f5e9", "#fff3e0", "#fbe9e7"];
+
+function TrainingSessionBuilder() {
+  const { role, userEmail } = useUserContext();
+  const queryClient = useQueryClient();
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    type: "Mandatory Training",
+    day1: "",
+    day2: "",
+  });
+  const [publishFeedback, setPublishFeedback] = useState<PublishFeedback | null>(null);
+
+  const overviewQuery = useQuery({
+    queryKey: ["schedulerOverview", role],
+    queryFn: () => fetchSchedulerOverview(role, userEmail).then((response) => response.data),
+  });
+
+  const sessions: SessionOverview[] = overviewQuery.data?.overview ?? [];
+  const unassigned: UnassignedPerson[] = overviewQuery.data?.unassigned ?? [];
+  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedSessionId && sessions.length) {
+      setSelectedSessionId(sessions[0].id);
+    }
+  }, [sessions, selectedSessionId]);
+
+  const assignMutation = useMutation({
+    mutationFn: (payload: { sessionId: string; personId: string; day: number; dropZoneId: string }) =>
+      assignPersonToSession(payload, role, userEmail),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (assignmentId: string) => removeSessionAssignment(assignmentId, role, userEmail),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] }),
+  });
+
+  const createSessionMutation = useMutation({
+    mutationFn: (payload: { name: string; type: string; day1: string; day2: string }) =>
+      createTrainingSession(payload, role, userEmail),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
+      setSelectedSessionId(response.data.session.id);
+      setForm({ name: "", type: "Mandatory Training", day1: "", day2: "" });
+    },
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: (sessionId: string) => publishTrainingSession(sessionId, role, userEmail),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
+      setPublishFeedback({
+        results: response.data.results,
+        publishedAt: response.data.publishedAt,
+      });
+    },
+  });
+
+  const homeColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const homes = new Set<string>();
+    unassigned.forEach((person) => homes.add(person.home));
+    selectedSession?.day1Assignments.forEach((assignment) => homes.add(assignment.person.home ?? "Unknown"));
+    selectedSession?.day2Assignments.forEach((assignment) => homes.add(assignment.person.home ?? "Unknown"));
+    Array.from(homes).forEach((home, index) => {
+      map.set(home, homePalette[index % homePalette.length]);
+    });
+    return map;
+  }, [unassigned, selectedSession]);
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>, payload: DragPayload) => {
+    event.dataTransfer.setData("application/json", JSON.stringify(payload));
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const parseDragPayload = (event: DragEvent<HTMLDivElement>) => {
+    const raw = event.dataTransfer.getData("application/json");
+    if (!raw) {
+      return null;
+    }
+    try {
+      return JSON.parse(raw) as DragPayload;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleDropOnDay = (event: DragEvent<HTMLDivElement>, day: number) => {
+    event.preventDefault();
+    if (!selectedSession) return;
+    const payload = parseDragPayload(event);
+    if (!payload) return;
+
+    const dropZoneId = `session-${selectedSession.id}-day-${day}-${payload.personId}-${Date.now()}`;
+    assignMutation.mutate(
+      { sessionId: selectedSession.id, personId: payload.personId, day, dropZoneId },
+      {
+        onSuccess: () => {
+          if (payload.assignmentId && payload.day && payload.day !== day) {
+            removeMutation.mutate(payload.assignmentId);
+          }
+        },
+      },
+    );
+  };
+
+  const handleDropToUnassigned = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const payload = parseDragPayload(event);
+    if (payload?.assignmentId) {
+      removeMutation.mutate(payload.assignmentId);
+    }
+  };
+
+  const formatDate = (value?: string) =>
+    value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "-";
+
+  const skippedResults = publishFeedback?.results.filter((result) => !result.moved) ?? [];
+
+  const findPersonName = (personId: string) => {
+    const assignments: SessionAssignment[] = [];
+    if (selectedSession) {
+      assignments.push(...selectedSession.day1Assignments, ...selectedSession.day2Assignments);
+    }
+    return assignments.find((assignment) => assignment.person.id === personId)?.person.name ?? personId;
+  };
+
+  return (
+    <Stack spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6">Training session planning</Typography>
+        <Typography variant="body2" color="text.secondary" mt={1}>
+          Create a session, drop people into Day 1/Day 2, then publish to update Planday shifts. Cards are coloured by
+          home so you can spot allocations at a glance.
+        </Typography>
+        <Stack component="form" spacing={2} mt={2} direction={{ xs: "column", md: "row" }}>
+          <TextField
+            label="Session name"
+            value={form.name}
+            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+            size="small"
+            fullWidth
+          />
+          <TextField
+            label="Type"
+            size="small"
+            value={form.type}
+            onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
+          />
+          <TextField
+            label="Day 1"
+            type="date"
+            size="small"
+            value={form.day1}
+            onChange={(event) => setForm((prev) => ({ ...prev, day1: event.target.value }))}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="Day 2"
+            type="date"
+            size="small"
+            value={form.day2}
+            onChange={(event) => setForm((prev) => ({ ...prev, day2: event.target.value }))}
+            InputLabelProps={{ shrink: true }}
+          />
+          <Button
+            variant="contained"
+            onClick={() => createSessionMutation.mutate(form)}
+            disabled={!form.name || !form.day1 || !form.day2 || createSessionMutation.isPending}
+          >
+            Create session
+          </Button>
+        </Stack>
+        {createSessionMutation.isError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Unable to create session
+          </Alert>
+        )}
+        {overviewQuery.isLoading && (
+          <Typography variant="caption" color="text.secondary" mt={1}>
+            Loading planners from the scheduler...
+          </Typography>
+        )}
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6">Active sessions</Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" mt={2}>
+          {sessions.map((session) => (
+            <Button
+              key={session.id}
+              variant={session.id === selectedSession?.id ? "contained" : "outlined"}
+              onClick={() => setSelectedSessionId(session.id)}
+            >
+              {session.name} · {formatDate(session.day1)} / {formatDate(session.day2)}
+            </Button>
+          ))}
+          {!sessions.length && <Typography color="text.secondary">No sessions yet</Typography>}
+        </Stack>
+      </Paper>
+
+      {selectedSession && (
+        <Paper sx={{ p: 3 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography variant="h6">Session {selectedSession.name}</Typography>
+            <Button
+              variant="contained"
+              disabled={publishMutation.isPending}
+              onClick={() => publishMutation.mutate(selectedSession.id)}
+            >
+              Publish to Planday
+            </Button>
+          </Stack>
+          {publishMutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              Unable to publish the session to Planday
+            </Alert>
+          )}
+          {publishFeedback && (
+            <Box mt={2}>
+              <Alert severity="success">
+                Published {selectedSession.name} ({skippedResults.length ? "with warnings" : "all shifts moved"}) ·{" "}
+                {new Date(publishFeedback.publishedAt).toLocaleTimeString()}
+              </Alert>
+              {skippedResults.length > 0 && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  Skipped updating {skippedResults.length} employee(s):
+                  <Stack component="ul" sx={{ mt: 1, ml: 2 }}>
+                    {skippedResults.map((result) => (
+                      <li key={`${result.personId}-${result.day}`}>
+                        {findPersonName(result.personId)} · {result.reason ?? "reason unknown"}
+                      </li>
+                    ))}
+                  </Stack>
+                </Alert>
+              )}
+            </Box>
+          )}
+          <Box
+            sx={{
+              mt: 2,
+              display: "grid",
+              gap: 2,
+              gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+            }}
+          >
+            {[1, 2].map((day) => (
+              <Paper
+                key={`day-${day}`}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => handleDropOnDay(event, day)}
+                sx={{
+                  minHeight: 220,
+                  p: 2,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                }}
+              >
+                <Typography variant="subtitle1" gutterBottom>
+                  Day {day} · {day === 1 ? formatDate(selectedSession.day1) : formatDate(selectedSession.day2)}
+                </Typography>
+                <Stack spacing={1}>
+                  {(day === 1 ? selectedSession.day1Assignments : selectedSession.day2Assignments).map(
+                    (assignment) => (
+                      <Paper
+                        key={assignment.id}
+                        draggable
+                        onDragStart={(event) =>
+                          handleDragStart(event, {
+                            personId: assignment.person.id,
+                            assignmentId: assignment.id,
+                            day,
+                            source: day === 1 ? "day1" : "day2",
+                          })
+                        }
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          px: 2,
+                          py: 1,
+                          borderLeft: 4,
+                          borderColor: homeColorMap.get(assignment.person.home ?? "Unknown") ?? "primary.main",
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="body1">{assignment.person.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {assignment.person.role} · {assignment.person.status}
+                          </Typography>
+                        </Box>
+                        <Chip label={assignment.person.status} size="small" />
+                      </Paper>
+                    ),
+                  )}
+                </Stack>
+              </Paper>
+            ))}
+          </Box>
+          <Paper
+            sx={{ mt: 3, p: 2, backgroundColor: (theme) => theme.palette.background.default }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDropToUnassigned}
+          >
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>
+              Drag an assignment card here to remove it, or drag unassigned staff into the days above.
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+              }}
+            >
+              {unassigned.map((person) => (
+                <Paper
+                  key={person.id}
+                  draggable
+                  onDragStart={(event) =>
+                    handleDragStart(event, { personId: person.id, source: "unassigned" })
+                  }
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    borderLeft: 4,
+                    borderColor: homeColorMap.get(person.home) ?? "divider",
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography variant="body1">{person.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {person.role} · due {person.nextDue ? formatDate(person.nextDue) : "no date"}
+                      </Typography>
+                    </Box>
+                    <Chip label={person.status} size="small" />
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    Home: {person.home} · last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "–"}
+                  </Typography>
+                </Paper>
+              ))}
+              {!unassigned.length && (
+                <Typography color="text.secondary">Everyone has been allocated.</Typography>
+              )}
+            </Box>
+          </Paper>
+        </Paper>
+      )}
+    </Stack>
+  );
+}
+
+export default TrainingSessionBuilder;

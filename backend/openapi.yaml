@@ -93,3 +93,91 @@ paths:
           in: query
           schema:
             type: string
+  /scheduler/overview:
+    get:
+      summary: Manager view of planned training sessions and sorted unassigned staff
+      responses:
+        "200":
+          description: Training session data and unassigned staff by due date
+  /scheduler/sessions:
+    post:
+      summary: Create a training session placeholder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - day1
+                - day2
+              properties:
+                name:
+                  type: string
+                day1:
+                  type: string
+                  format: date
+                day2:
+                  type: string
+                  format: date
+                type:
+                  type: string
+      responses:
+        "201":
+          description: Session created
+  /scheduler/assign:
+    post:
+      summary: Assign or move a person into a session day drop zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - personId
+                - day
+                - dropZoneId
+              properties:
+                sessionId:
+                  type: string
+                personId:
+                  type: string
+                day:
+                  type: integer
+                dropZoneId:
+                  type: string
+      responses:
+        "200":
+          description: Assignment updated
+  /scheduler/assign/remove:
+    post:
+      summary: Remove an assignment card from a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - assignmentId
+              properties:
+                assignmentId:
+                  type: string
+      responses:
+        "204":
+          description: Assignment removed
+  /scheduler/sessions/{sessionId}/publish:
+    post:
+      summary: Publish a session so Planday shifts are updated
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shift publication completed

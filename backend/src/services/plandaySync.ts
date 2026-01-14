@@ -11,6 +11,7 @@ const httpClient = axios.create({
   timeout: 15000,
   headers: plandayToken ? { Authorization: `Bearer ${plandayToken}` } : {},
 });
+export { httpClient as plandayClient };
 
 interface PlandayRole {
   id: string;

@@ -5,6 +5,8 @@ import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { Assignment } from "../entities/Assignment";
 import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
+import { TrainingSession } from "../entities/TrainingSession";
+import { SessionAssignment } from "../entities/SessionAssignment";
 
 async function seed(): Promise<void> {
   const dataSource = await AppDataSource.initialize();
@@ -111,6 +113,35 @@ async function seed(): Promise<void> {
     );
 
     console.log("Seed data inserted");
+    const sessionRepo = dataSource.getRepository(TrainingSession);
+    const sessionAssignmentRepo = dataSource.getRepository(SessionAssignment);
+
+    const session = await sessionRepo.save(
+      sessionRepo.create({
+        name: "Mandatory Care Refresh",
+        day1: new Date(),
+        day2: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        type: "Mandatory Training",
+      }),
+    );
+
+    await sessionAssignmentRepo.save(
+      sessionAssignmentRepo.create({
+        session,
+        person: alice,
+        day: 1,
+        dropZoneId: "SessionD1",
+      }),
+    );
+
+    await sessionAssignmentRepo.save(
+      sessionAssignmentRepo.create({
+        session,
+        person: bob,
+        day: 2,
+        dropZoneId: "SessionD2",
+      }),
+    );
   } finally {
     await dataSource.destroy();
   }

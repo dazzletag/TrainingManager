@@ -6,6 +6,8 @@ import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { Assignment } from "../entities/Assignment";
 import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
+import { TrainingSession } from "../entities/TrainingSession";
+import { SessionAssignment } from "../entities/SessionAssignment";
 
 dotenv.config();
 
@@ -24,7 +26,16 @@ export const AppDataSource = new DataSource({
   database,
   synchronize: false,
   logging: false,
-  entities: [Person, Role, TrainingRequirement, Assignment, Evidence, AuditLog],
+  entities: [
+    Person,
+    Role,
+    TrainingRequirement,
+    Assignment,
+    Evidence,
+    AuditLog,
+    TrainingSession,
+    SessionAssignment,
+  ],
   migrations: [__dirname + "/migrations/*.{ts,js}"],
   options: {
     encrypt: true,

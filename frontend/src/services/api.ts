@@ -76,3 +76,41 @@ export function fetchRoles(role: string, email: string) {
     headers: withHeaders(role, email),
   });
 }
+
+export function fetchSchedulerOverview(role: string, email: string) {
+  return apiClient.get("/scheduler/overview", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function createTrainingSession(body: any, role: string, email: string) {
+  return apiClient.post("/scheduler/sessions", body, {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function assignPersonToSession(body: any, role: string, email: string) {
+  return apiClient.post("/scheduler/assign", body, {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function removeSessionAssignment(assignmentId: string, role: string, email: string) {
+  return apiClient.post(
+    "/scheduler/assign/remove",
+    { assignmentId },
+    {
+      headers: withHeaders(role, email),
+    },
+  );
+}
+
+export function publishTrainingSession(sessionId: string, role: string, email: string) {
+  return apiClient.post(
+    `/scheduler/sessions/${sessionId}/publish`,
+    {},
+    {
+      headers: withHeaders(role, email),
+    },
+  );
+}

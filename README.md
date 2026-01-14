@@ -7,6 +7,7 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
 - **Backend (`backend/`)** – Express + TypeORM API, clear domain model (Person, Role, TrainingRequirement, Assignment, Evidence, AuditLog), Planday sync service, and OpenAPI spec.
 - **Frontend (`frontend/`)** – React + TypeScript with Material UI and React Query; role switcher lets you preview Staff, Manager, Admin experiences without recreating Power Apps.
 - **Infra (`infra/`)** – Bicep template that provisions Azure SQL, App Service, and Key Vault, wiring managed identities and app settings for secrets.
+- **Scheduler & Planday autop** – Manager-focused session builder that surfaces due-first staff, lets you drag home-coloured cards into Day 1/Day 2 drop zones, and, once published, removes them from conflicting shifts and replaces them with a dedicated training shift unless they are on holiday.
 
 ## Getting started
 
@@ -43,6 +44,9 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
 - `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` – Azure SQL connection.
 - `PLANDAY_API_URL` & `PLANDAY_API_TOKEN` – used by the background sync job (fetches `/roles` and `/employees`, assumes `id`, `roleId`, `employmentStatus`, etc.).
 - `PLANDAY_SYNC_INTERVAL_MS` – optional override for the sync cadence (default 30 minutes).
+- `PLANDAY_TRAINING_SHIFT_POSITION_ID` – the Planday position that represents the training shift (required when publishing sessions).
+- `PLANDAY_TRAINING_SHIFT_START_HOUR` & `PLANDAY_TRAINING_SHIFT_END_HOUR` – hour of day used to build shift windows for `assignToTrainingShift` (defaults to 09:00-17:00 local time).
+- `PLANDAY_TRAINING_SHIFT_NOTE_PREFIX` – human-friendly prefix added to shift notes so operators can trace a Planday entry back to the TrainingManager session.
 - `AZURE_AUTH_ENABLED` – flip to `true` once the App Service and API have Azure AD/Entra ID integration so the middleware validates bearer tokens issued by Microsoft.
 - `AZURE_TENANT_ID` + `AZURE_CLIENT_ID` – consumed by `azureAuthMiddleware` to confirm the issuer/audience, populate `req.user` with `oid/roles/preferred_username`, and keep fake headers disabled.
 - Secrets belong in Key Vault; the App Service identity can be granted `get`/`list` permissions and the values injected as app settings.
@@ -68,7 +72,9 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
   - `POST /api/v1/staff/{personId}/evidence` to ingest proof.
   - `GET /api/v1/manager/compliance` and `/manager/at-risk` for leaders.
   - `GET /api/v1/admin/audit` and `/admin/training-requirements`.
-- React queries hydrate these endpoints and merchant the role-based UX stack.
+  - `GET /api/v1/scheduler/overview` / `POST /api/v1/scheduler/sessions` / `POST /api/v1/scheduler/assign` for the drag-and-drop manager workflow.
+  - `POST /api/v1/scheduler/sessions/{sessionId}/publish` to instruct Planday (handles shift removal, holiday skips, and training shift creation).
+  - React queries hydrate these endpoints and merchant the role-based UX stack.
 
 ## Azure resource plan
 
@@ -81,6 +87,7 @@ The Bicep template wires the App Service to the SQL server and exposes outputs (
 ### Key Vault secrets & App Service wiring
 
 - `tmkvmke0gyn2` now contains secrets `db-password`, `planday-api-token`, `azure-tenant-id`, and `azure-client-id`. These are the values the App Service should reference via `@Microsoft.KeyVault(SecretUri=...)`.
+- The same vault also hosts `planday-training-shift-position-id`, `planday-training-shift-start-hour`, `planday-training-shift-end-hour`, and `planday-training-shift-note-prefix` so the published training shifts can be reconfigured without redeploying code.
 - Azure CLI on this machine struggled to inject those references directly (the CLI split parentheses through the Windows shell), so the App Service currently holds the plaintext host, DB name, and non-secret flags. Use the Azure Portal, `Set-AzWebApp` in PowerShell, or a properly quoted `az resource update` call to replace `DB_PASSWORD`, `PLANDAY_API_TOKEN`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_ID` with the secret URIs above.
 - Once you have a real App Registration for tokens, set `AZURE_AUTH_ENABLED=true` and update `AZURE_CLIENT_ID` to the registration’s application ID so the backend switches from the mock headers to Entra ID tokens.
 

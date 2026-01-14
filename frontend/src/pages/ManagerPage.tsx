@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { fetchManagerAtRisk, fetchManagerCompliance } from "../services/api";
 import { useUserContext } from "../context/UserContext";
+import TrainingSessionBuilder from "../components/TrainingSessionBuilder";
 
 function ManagerPage() {
   const { role, userEmail } = useUserContext();
@@ -102,6 +103,8 @@ function ManagerPage() {
           </List>
         )}
       </Paper>
+
+      <TrainingSessionBuilder />
     </Stack>
   );
 }
