@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: TrainingManager API
+  version: 0.1.0
+  description: >
+    Evidence-centered REST API for the Mandatory Training & Competency platform.
+servers:
+  - url: http://localhost:4000/api/v1
+paths:
+  /staff/{personId}/requirements:
+    get:
+      summary: Staff training requirements with compliance status
+      parameters:
+        - name: personId
+          in: path
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: List of requirements and statuses
+  /staff/{personId}/evidence:
+    post:
+      summary: Upload evidence for a requirement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requirementId
+                - type
+                - source
+                - validFrom
+                - validTo
+                - uploadedFileKey
+                - verifiedBy
+              properties:
+                requirementId:
+                  type: string
+                type:
+                  type: string
+                source:
+                  type: string
+                validFrom:
+                  type: string
+                  format: date-time
+                validTo:
+                  type: string
+                  format: date-time
+                uploadedFileKey:
+                  type: string
+                verifiedBy:
+                  type: string
+                confidenceLevel:
+                  type: number
+      responses:
+        "201":
+          description: Evidence accepted
+  /manager/compliance:
+    get:
+      summary: Compliance overview grouped by home and role
+  /manager/at-risk:
+    get:
+      summary: At-risk staff summary
+  /manager/evidence/{personId}:
+    get:
+      summary: Evidence ledger for a person
+  /admin/training-requirements:
+    get:
+      summary: List training requirements
+    post:
+      summary: Create/update a training requirement
+  /admin/audit:
+    get:
+      summary: Audit trail
+  /admin/evidence/{evidenceId}/approve:
+    post:
+      summary: Approve or override evidence
+  /admin/roles:
+    get:
+      summary: List configured roles
+  /staff/profile:
+    get:
+      summary: Lookup staff profile by external ID or email
+      parameters:
+        - name: externalId
+          in: query
+          schema:
+            type: string
+        - name: email
+          in: query
+          schema:
+            type: string

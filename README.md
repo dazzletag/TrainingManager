@@ -1,0 +1,85 @@
+# TrainingManager
+
+Mandatory Training & Competency platform built with a React + Node/TypeScript stack, evidence-first rules, role-aware UX, and Azure-native infrastructure.
+
+## What’s included
+
+- **Backend (`backend/`)** – Express + TypeORM API, clear domain model (Person, Role, TrainingRequirement, Assignment, Evidence, AuditLog), Planday sync service, and OpenAPI spec.
+- **Frontend (`frontend/`)** – React + TypeScript with Material UI and React Query; role switcher lets you preview Staff, Manager, Admin experiences without recreating Power Apps.
+- **Infra (`infra/`)** – Bicep template that provisions Azure SQL, App Service, and Key Vault, wiring managed identities and app settings for secrets.
+
+## Getting started
+
+1. **Backend**
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env   # add DB_* and PLANDAY_* values
+   npm run migrate
+   npm run seed
+   npm run dev
+   ```
+   - The API listens on `http://localhost:4000` by default and uses `x-user-role`/`x-user-email` headers as a placeholder for Azure AD claims.
+   - Browse `backend/openapi.yaml` to understand available routes.
+
+2. **Frontend**
+   ```bash
+   cd frontend
+   npm install
+   export VITE_API_BASE_URL=http://localhost:4000/api/v1
+   npm run dev
+   ```
+   - Role, person external ID, and user email can be adjusted via the role switcher in the top-right corner.
+   - Use the Manager and Admin tabs to inspect compliance summaries, overrides, and audit logs.
+
+3. **Infrastructure**
+   - Deploy `infra/main.bicep` with Azure CLI to create SQL, App Service, and Key Vault in one shot. See `infra/README.md` for parameters.
+   - After deployment, point frontend `VITE_API_BASE_URL` at the App Service hostname and configure backend env vars from the provisioned SQL/Key Vault.
+
+## Environment variables
+
+### Backend
+
+- `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` – Azure SQL connection.
+- `PLANDAY_API_URL` & `PLANDAY_API_TOKEN` – used by the background sync job (fetches `/roles` and `/employees`, assumes `id`, `roleId`, `employmentStatus`, etc.).
+- `PLANDAY_SYNC_INTERVAL_MS` – optional override for the sync cadence (default 30 minutes).
+- Secrets belong in Key Vault; the App Service identity can be granted `get`/`list` permissions and the values injected as app settings.
+
+### Frontend
+
+- `VITE_API_BASE_URL` – e.g., `https://trainingmanager.azurewebsites.net/api/v1`.
+- `VITE_DEMO_PERSON_EXTERNAL_ID` – default staff profile external ID for the staff dashboard (matches seed data).
+
+## Domain & design notes
+
+- All compliance statuses are derived from evidence: `Evidence` includes `validFrom/validTo`, `confidenceLevel`, and `uploadedFileKey`.
+- `Assignment` links `Person` ↔ `TrainingRequirement` without storing completion flags.
+- `TrainingRequirement` → `Role` uses a many-to-many join so regulators can inspect which obligations apply per role category.
+- `AuditLog` captures `who`, `what`, `when`, `why` for approvals, evidence uploads, and requirement creations.
+- Planday sync stores immutable external IDs and avoids redundant HR data; the service is idempotent and uses env vars for API secrets.
+
+## Operations & validation
+
+- Run `npm run build` in both `backend/` and `frontend/` to perform full TypeScript and bundler validations (already verified in this repo).
+- The backend exposes:
+  - `GET /api/v1/staff/profile?externalId={id}` for staff dashboards.
+  - `POST /api/v1/staff/{personId}/evidence` to ingest proof.
+  - `GET /api/v1/manager/compliance` and `/manager/at-risk` for leaders.
+  - `GET /api/v1/admin/audit` and `/admin/training-requirements`.
+- React queries hydrate these endpoints and merchant the role-based UX stack.
+
+## Azure resource plan
+
+- **Azure SQL Database** – managed relational store with TypeORM migrations (`backend/src/db/migrations/InitialSchema.ts`).
+- **App Service + Plan** – hosts the Node API with a system-assigned identity; Bicep ensures the identity can read Key Vault secrets.
+- **Key Vault** – stores DB credentials, Planday token, and future API secrets.
+
+The Bicep template wires the App Service to the SQL server and exposes outputs (`sqlServerHost`, `appEndpoint`) for configuration.
+
+## Future expansion ideas
+
+1. **Mobile-friendly proxy** – wrap the REST API with a dedicated mobile shell or expose GraphQL for mobile apps to fetch evidence timelines.
+2. **Revalidation workflows** – schedule revalidation campaigns tied to `validTo` + `ValidityPeriod` and notify managers via Teams/Email.
+3. **Evidence sharing/trust** – integrate Proof-of-Work templates, store signed PDFs in Azure Storage, and publish traceable certificates to regulators.
+
+Feel free to iterate on the backend services, enrich front-end dashboards, or extend the Bicep template with networking/storage as regulators and operations demand.
