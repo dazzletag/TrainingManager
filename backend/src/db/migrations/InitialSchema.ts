@@ -11,7 +11,7 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "role",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
           { name: "externalId", type: "varchar", isUnique: true },
           { name: "name", type: "varchar" },
           { name: "category", type: "varchar" },
@@ -26,14 +26,14 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "person",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
           { name: "externalId", type: "varchar", isUnique: true },
           { name: "fullName", type: "varchar" },
           { name: "email", type: "varchar", isUnique: true },
           { name: "employmentStatus", type: "varchar" },
           { name: "homeLocation", type: "varchar" },
-          { name: "isActive", type: "bit", default: true },
-          { name: "roleId", type: "uuid" },
+          { name: "isActive", type: "bit", default: 1 },
+          { name: "roleId", type: "uniqueidentifier" },
           { name: "createdAt", type: "datetime2", default: "GETUTCDATE()" },
           { name: "updatedAt", type: "datetime2", default: "GETUTCDATE()" },
         ],
@@ -44,11 +44,11 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "training_requirement",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
           { name: "name", type: "varchar", isUnique: true },
           { name: "description", type: "text" },
           { name: "validityPeriodMonths", type: "int" },
-          { name: "mandatory", type: "bit", default: true },
+          { name: "mandatory", type: "bit", default: 1 },
           { name: "createdAt", type: "datetime2", default: "GETUTCDATE()" },
           { name: "updatedAt", type: "datetime2", default: "GETUTCDATE()" },
         ],
@@ -59,9 +59,9 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "assignment",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
-          { name: "personId", type: "uuid" },
-          { name: "requirementId", type: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "personId", type: "uniqueidentifier" },
+          { name: "requirementId", type: "uniqueidentifier" },
           { name: "createdAt", type: "datetime2", default: "GETUTCDATE()" },
           { name: "updatedAt", type: "datetime2", default: "GETUTCDATE()" },
         ],
@@ -72,8 +72,8 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "evidence",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
-          { name: "assignmentId", type: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "assignmentId", type: "uniqueidentifier" },
           { name: "type", type: "varchar" },
           { name: "source", type: "varchar" },
           { name: "validFrom", type: "datetime2" },
@@ -91,7 +91,7 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "audit_log",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
           { name: "who", type: "varchar" },
           { name: "what", type: "varchar" },
           { name: "when", type: "datetime2" },
@@ -105,8 +105,8 @@ export class InitialSchema1682347206000 implements MigrationInterface {
       new Table({
         name: "training_requirement_roles_role",
         columns: [
-          { name: "trainingRequirementId", type: "uuid" },
-          { name: "roleId", type: "uuid" },
+          { name: "trainingRequirementId", type: "uniqueidentifier" },
+          { name: "roleId", type: "uniqueidentifier" },
         ],
       }),
     );

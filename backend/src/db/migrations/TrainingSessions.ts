@@ -7,7 +7,7 @@ export class TrainingSessions1684090400000 implements MigrationInterface {
       new Table({
         name: "training_session",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
           { name: "name", type: "varchar" },
           { name: "day1", type: "date" },
           { name: "day2", type: "date" },
@@ -22,9 +22,9 @@ export class TrainingSessions1684090400000 implements MigrationInterface {
       new Table({
         name: "session_assignment",
         columns: [
-          { name: "id", type: "uuid", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
-          { name: "sessionId", type: "uuid" },
-          { name: "personId", type: "uuid" },
+          { name: "id", type: "uniqueidentifier", isPrimary: true, isGenerated: true, generationStrategy: "uuid" },
+          { name: "sessionId", type: "uniqueidentifier" },
+          { name: "personId", type: "uniqueidentifier" },
           { name: "day", type: "int" },
           { name: "dropZoneId", type: "varchar" },
           { name: "createdAt", type: "datetime2", default: "GETUTCDATE()" },

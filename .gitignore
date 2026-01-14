@@ -10,3 +10,4 @@ backend/node_modules/
 backend/dist/
 infra/.terraform/
 *.log
+backend.zip
