@@ -78,6 +78,12 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
 
 The Bicep template wires the App Service to the SQL server and exposes outputs (`sqlServerHost`, `appEndpoint`) for configuration.
 
+### Key Vault secrets & App Service wiring
+
+- `tmkvmke0gyn2` now contains secrets `db-password`, `planday-api-token`, `azure-tenant-id`, and `azure-client-id`. These are the values the App Service should reference via `@Microsoft.KeyVault(SecretUri=...)`.
+- Azure CLI on this machine struggled to inject those references directly (the CLI split parentheses through the Windows shell), so the App Service currently holds the plaintext host, DB name, and non-secret flags. Use the Azure Portal, `Set-AzWebApp` in PowerShell, or a properly quoted `az resource update` call to replace `DB_PASSWORD`, `PLANDAY_API_TOKEN`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_ID` with the secret URIs above.
+- Once you have a real App Registration for tokens, set `AZURE_AUTH_ENABLED=true` and update `AZURE_CLIENT_ID` to the registration’s application ID so the backend switches from the mock headers to Entra ID tokens.
+
 ## Future expansion ideas
 
 1. **Mobile-friendly proxy** – wrap the REST API with a dedicated mobile shell or expose GraphQL for mobile apps to fetch evidence timelines.
