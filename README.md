@@ -74,7 +74,9 @@ Mandatory Training & Competency platform built with a React + Node/TypeScript st
   - `GET /api/v1/admin/audit` and `/admin/training-requirements`.
   - `GET /api/v1/scheduler/overview` / `POST /api/v1/scheduler/sessions` / `POST /api/v1/scheduler/assign` for the drag-and-drop manager workflow.
   - `POST /api/v1/scheduler/sessions/{sessionId}/publish` to instruct Planday (handles shift removal, holiday skips, and training shift creation).
-  - React queries hydrate these endpoints and merchant the role-based UX stack.
+- React queries hydrate these endpoints and merchant the role-based UX stack.
+
+- The frontend is deployed to `https://trainingmanager-frontend.azurewebsites.net` and reads `VITE_API_BASE_URL` from App Service configuration (currently pointing to the backend). Run `npm run build` and deploy `frontend/dist` via a run-from-package zip whenever you change the UI.
 
 ## Azure resource plan
 

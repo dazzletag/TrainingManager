@@ -11,3 +11,4 @@ backend/dist/
 infra/.terraform/
 *.log
 backend.zip
+frontend-package.zip
