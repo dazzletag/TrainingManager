@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sys
+import tempfile
 import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -82,6 +83,16 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
         "PLANDAY_TRAINING_MATRIX_FILE",
         r"C:\Users\Darren\OneDrive - Bristol Care Homes\Desktop\trainingRqmt.xlsx",
     )
+    matrix_url = os.getenv("PLANDAY_TRAINING_MATRIX_URL", "").strip()
+    temp_file = None
+    if matrix_url:
+        response = requests.get(matrix_url, timeout=60)
+        response.raise_for_status()
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        temp_file.write(response.content)
+        temp_file.flush()
+        temp_file.close()
+        path = temp_file.name
     if not os.path.exists(path):
         raise RuntimeError(f"Training matrix not found at {path}")
 
@@ -127,6 +138,12 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
                 "period_years": period_years,
             }
         )
+
+    if temp_file:
+        try:
+            os.unlink(temp_file.name)
+        except OSError:
+            pass
 
     return required, group_names
 
