@@ -9,6 +9,28 @@ import { logAudit } from "../services/auditLogger";
 
 const router = Router();
 
+router.get("/directory", async (req, res) => {
+  const limitRaw = req.query.limit as string | undefined;
+  const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : 10;
+  const limit = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 10, 1), 100);
+
+  const personRepo = AppDataSource.getRepository(Person);
+  const people = await personRepo.find({
+    select: {
+      id: true,
+      externalId: true,
+      fullName: true,
+      email: true,
+      employmentStatus: true,
+      homeLocation: true,
+    },
+    order: { fullName: "ASC" },
+    take: limit,
+  });
+
+  res.json({ people });
+});
+
 router.get("/profile", async (req, res) => {
   const externalId = req.query.externalId as string | undefined;
   const email = req.query.email as string | undefined;

@@ -23,6 +23,13 @@ export function fetchStaffProfile(externalId: string, role: string, email: strin
   });
 }
 
+export function fetchStaffDirectory(role: string, email: string, limit = 1) {
+  return apiClient.get("/staff/directory", {
+    headers: withHeaders(role, email),
+    params: { limit },
+  });
+}
+
 export function submitEvidence(personId: string, payload: any, role: string, email: string) {
   return apiClient.post(`/staff/${personId}/evidence`, payload, {
     headers: withHeaders(role, email),

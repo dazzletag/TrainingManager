@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { fetchStaffDirectory } from "../services/api";
 
 type Role = "staff" | "manager" | "admin";
 
@@ -13,6 +14,7 @@ interface UserContextValue {
 }
 
 const defaultExternalId = import.meta.env.VITE_DEMO_PERSON_EXTERNAL_ID ?? "planday-employee-001";
+const placeholderExternalId = "planday-employee-001";
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
@@ -20,6 +22,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>("staff");
   const [personExternalId, setPersonExternalId] = useState(defaultExternalId);
   const [userEmail, setUserEmail] = useState("demo.user@trainingmanager.local");
+
+  useEffect(() => {
+    if (personExternalId !== placeholderExternalId || defaultExternalId !== placeholderExternalId) {
+      return;
+    }
+
+    let isActive = true;
+    fetchStaffDirectory(role, userEmail, 1)
+      .then((response) => {
+        const candidate = response.data?.people?.[0];
+        if (isActive && candidate?.externalId) {
+          setPersonExternalId(candidate.externalId);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
+  }, [personExternalId, role, userEmail]);
 
   const value = useMemo(
     () => ({ role, setRole, personExternalId, setPersonExternalId, userEmail, setUserEmail }),
