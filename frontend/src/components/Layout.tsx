@@ -120,6 +120,7 @@ function Layout() {
           flexGrow: 1,
           p: { xs: 2, md: 3 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` },
           mt: 8,
         }}
       >
