@@ -571,6 +571,29 @@ def ensure_role_requirement_link(
     requirement_role_links.add(key)
 
 
+def remove_job_title_links(
+    cursor: pyodbc.Cursor,
+    requirement_role_links: set,
+) -> None:
+    cursor.execute("SELECT id FROM role WHERE externalId LIKE 'planday-job-%'")
+    role_ids = [str(row.id) for row in cursor.fetchall()]
+    if not role_ids:
+        return
+
+    chunk_size = 200
+    for start in range(0, len(role_ids), chunk_size):
+        chunk = role_ids[start : start + chunk_size]
+        placeholders = ",".join("?" for _ in chunk)
+        cursor.execute(
+            f"DELETE FROM training_requirement_roles_role WHERE roleId IN ({placeholders})",
+            *chunk,
+        )
+
+    requirement_role_links.difference_update(
+        {(req_id, role_id) for req_id, role_id in requirement_role_links if role_id in role_ids}
+    )
+
+
 def ensure_person(
     cursor: pyodbc.Cursor,
     persons_by_external: Dict[str, Dict[str, Any]],
@@ -741,6 +764,7 @@ def main() -> int:
     roles_by_external, roles_by_name, persons_by_external, assignments_by_key, requirement_role_links = fetch_lookup_maps(
         cursor
     )
+    remove_job_title_links(cursor, requirement_role_links)
     requirements_by_name: Dict[str, Dict[str, Any]] = {}
     cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
     for row in cursor.fetchall():
