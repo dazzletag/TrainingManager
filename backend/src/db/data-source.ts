@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { Person } from "../entities/Person";
 import { Role } from "../entities/Role";
 import { TrainingRequirement } from "../entities/TrainingRequirement";
+import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { Assignment } from "../entities/Assignment";
 import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
@@ -30,6 +31,7 @@ export const AppDataSource = new DataSource({
     Person,
     Role,
     TrainingRequirement,
+    TrainingRequirementGroup,
     Assignment,
     Evidence,
     AuditLog,

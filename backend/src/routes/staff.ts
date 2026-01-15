@@ -2,12 +2,53 @@ import { Router } from "express";
 import { AppDataSource } from "../db/data-source";
 import { Assignment } from "../entities/Assignment";
 import { TrainingRequirement } from "../entities/TrainingRequirement";
+import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { Person } from "../entities/Person";
 import { Evidence } from "../entities/Evidence";
 import { evaluateRequirement } from "../services/complianceService";
 import { logAudit } from "../services/auditLogger";
+import { In } from "typeorm";
 
 const router = Router();
+
+function resolveRequirementMeta(
+  requirement: TrainingRequirement,
+  groupMeta?: { requiredLevel: number; mandatory: boolean },
+): TrainingRequirement {
+  if (!groupMeta) {
+    return requirement;
+  }
+  return Object.assign({}, requirement, {
+    requiredLevel: groupMeta.requiredLevel,
+    mandatory: groupMeta.mandatory,
+  });
+}
+
+async function buildRequirementMetaMap(groupIds: string[]) {
+  if (!groupIds.length) {
+    return new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  }
+  const repo = AppDataSource.getRepository(TrainingRequirementGroup);
+  const links = await repo.find({
+    where: { roleId: In(groupIds) },
+  });
+  const metaMap = new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  for (const link of links) {
+    const existing = metaMap.get(link.requirementId);
+    if (!existing) {
+      metaMap.set(link.requirementId, {
+        requiredLevel: link.requiredLevel,
+        mandatory: link.mandatory,
+      });
+      continue;
+    }
+    metaMap.set(link.requirementId, {
+      requiredLevel: Math.min(existing.requiredLevel, link.requiredLevel),
+      mandatory: existing.mandatory || link.mandatory,
+    });
+  }
+  return metaMap;
+}
 
 router.get("/directory", async (req, res) => {
   const limitRaw = req.query.limit as string | undefined;
@@ -78,9 +119,8 @@ router.get("/profile", async (req, res) => {
   const person = await personRepo.findOne({
     where: externalId ? { externalId } : { email },
     relations: {
-      role: {
-        trainingRequirements: true,
-      },
+      role: true,
+      groups: true,
       assignments: {
         evidence: true,
       },
@@ -93,8 +133,13 @@ router.get("/profile", async (req, res) => {
 
   const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
   const requirementList = (person.assignments ?? []).map((assignment) => assignment.requirement);
+  const groupIds = person.groups?.map((group) => group.id) ?? [];
+  const requirementMeta = await buildRequirementMetaMap(groupIds);
   const requirements = requirementList.map((requirement) =>
-    evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
+    evaluateRequirement(
+      resolveRequirementMeta(requirement, requirementMeta.get(requirement.id)),
+      assignmentMap.get(requirement.id),
+    ),
   );
 
   res.json({
@@ -116,9 +161,8 @@ router.get("/:personId/requirements", async (req, res) => {
   const person = await personRepo.findOne({
     where: { id: personId },
     relations: {
-      role: {
-        trainingRequirements: true,
-      },
+      role: true,
+      groups: true,
       assignments: {
         evidence: true,
       },
@@ -131,8 +175,13 @@ router.get("/:personId/requirements", async (req, res) => {
 
   const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
   const requirementList = (person.assignments ?? []).map((assignment) => assignment.requirement);
+  const groupIds = person.groups?.map((group) => group.id) ?? [];
+  const requirementMeta = await buildRequirementMetaMap(groupIds);
   const requirements = requirementList.map((requirement) =>
-    evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
+    evaluateRequirement(
+      resolveRequirementMeta(requirement, requirementMeta.get(requirement.id)),
+      assignmentMap.get(requirement.id),
+    ),
   );
 
   res.json({

@@ -3,8 +3,11 @@ import { AppDataSource } from "../db/data-source";
 import { TrainingSession } from "../entities/TrainingSession";
 import { Person } from "../entities/Person";
 import { SessionAssignment } from "../entities/SessionAssignment";
+import { TrainingRequirement } from "../entities/TrainingRequirement";
+import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { evaluateRequirement } from "../services/complianceService";
 import { assignToTrainingShift } from "../services/plandayScheduling";
+import { In } from "typeorm";
 
 const router = Router();
 
@@ -12,10 +15,75 @@ function listRequirements(person: Person) {
   return (person.assignments ?? []).map((assignment) => assignment.requirement);
 }
 
-function summarizeCompliance(person: Person) {
+function resolveRequirementMeta(
+  requirement: TrainingRequirement,
+  groupMeta?: { requiredLevel: number; mandatory: boolean },
+): TrainingRequirement {
+  if (!groupMeta) {
+    return requirement;
+  }
+  return Object.assign({}, requirement, {
+    requiredLevel: groupMeta.requiredLevel,
+    mandatory: groupMeta.mandatory,
+  });
+}
+
+async function buildRequirementMetaByGroup(groupIds: string[]) {
+  if (!groupIds.length) {
+    return new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
+  }
+  const repo = AppDataSource.getRepository(TrainingRequirementGroup);
+  const links = await repo.find({
+    where: { roleId: In(groupIds) },
+  });
+  const byGroup = new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
+  for (const link of links) {
+    if (!byGroup.has(link.roleId)) {
+      byGroup.set(link.roleId, new Map());
+    }
+    byGroup.get(link.roleId)!.set(link.requirementId, {
+      requiredLevel: link.requiredLevel,
+      mandatory: link.mandatory,
+    });
+  }
+  return byGroup;
+}
+
+function mergeGroupRequirementMeta(
+  groupIds: string[],
+  byGroup: Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>,
+) {
+  const metaMap = new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  for (const groupId of groupIds) {
+    const groupMap = byGroup.get(groupId);
+    if (!groupMap) continue;
+    for (const [requirementId, meta] of groupMap.entries()) {
+      const existing = metaMap.get(requirementId);
+      if (!existing) {
+        metaMap.set(requirementId, { ...meta });
+        continue;
+      }
+      metaMap.set(requirementId, {
+        requiredLevel: Math.min(existing.requiredLevel, meta.requiredLevel),
+        mandatory: existing.mandatory || meta.mandatory,
+      });
+    }
+  }
+  return metaMap;
+}
+
+function summarizeCompliance(
+  person: Person,
+  requirementMetaByGroup: Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>,
+) {
   const requirementMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
+  const groupIds = person.groups?.map((group) => group.id) ?? [];
+  const requirementMeta = mergeGroupRequirementMeta(groupIds, requirementMetaByGroup);
   const requirements = listRequirements(person).map((requirement) =>
-    evaluateRequirement(requirement, requirementMap.get(requirement.id)),
+    evaluateRequirement(
+      resolveRequirementMeta(requirement, requirementMeta.get(requirement.id)),
+      requirementMap.get(requirement.id),
+    ),
   );
   const hasIssue = requirements.some((requirement) => requirement.status !== "compliant");
   return {
@@ -52,6 +120,7 @@ router.get("/overview", async (_req, res) => {
           role: {
             trainingRequirements: true,
           },
+          groups: true,
           assignments: {
             evidence: true,
           },
@@ -62,14 +131,21 @@ router.get("/overview", async (_req, res) => {
 
   const personList = await personRepo.find({
     relations: {
-      role: {
-        trainingRequirements: true,
-      },
+      role: true,
+      groups: true,
       assignments: {
         evidence: true,
       },
     },
   });
+  const allPeople = [
+    ...personList,
+    ...sessions.flatMap((session) => session.assignments.map((assignment) => assignment.person)),
+  ];
+  const groupIds = Array.from(
+    new Set(allPeople.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
+  );
+  const requirementMetaByGroup = await buildRequirementMetaByGroup(groupIds);
 
   const assignedPersonIds = new Set(
     sessions.flatMap((session) => session.assignments.map((assignment) => assignment.person.id)),
@@ -88,7 +164,7 @@ router.get("/overview", async (_req, res) => {
           email: assignment.person.email,
           role: assignment.person.role.name,
           home: assignment.person.homeLocation,
-          status: summarizeCompliance(assignment.person).status,
+          status: summarizeCompliance(assignment.person, requirementMetaByGroup).status,
         },
       }));
 
@@ -104,7 +180,7 @@ router.get("/overview", async (_req, res) => {
           email: assignment.person.email,
           role: assignment.person.role.name,
           home: assignment.person.homeLocation,
-          status: summarizeCompliance(assignment.person).status,
+          status: summarizeCompliance(assignment.person, requirementMetaByGroup).status,
         },
       }));
 
@@ -122,7 +198,7 @@ router.get("/overview", async (_req, res) => {
   const unassigned = personList
     .filter((person) => !assignedPersonIds.has(person.id))
     .map((person) => {
-      const compliance = summarizeCompliance(person);
+      const compliance = summarizeCompliance(person, requirementMetaByGroup);
       const trainingDates = getTrainingDates(person);
       return {
         id: person.id,

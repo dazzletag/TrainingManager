@@ -369,7 +369,16 @@ def build_db_connection() -> pyodbc.Connection:
     return pyodbc.connect(conn_str)
 
 
-def fetch_lookup_maps(cursor: pyodbc.Cursor) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[Tuple[str, str], str], Dict[Tuple[str, str], str], set]:
+def fetch_lookup_maps(
+    cursor: pyodbc.Cursor,
+) -> Tuple[
+    Dict[str, Any],
+    Dict[str, Any],
+    Dict[str, Any],
+    Dict[Tuple[str, str], str],
+    Dict[Tuple[str, str], Dict[str, Any]],
+    Dict[str, set],
+]:
     roles_by_external: Dict[str, Dict[str, Any]] = {}
     roles_by_name: Dict[str, Dict[str, Any]] = {}
     cursor.execute("SELECT id, externalId, name FROM role")
@@ -415,17 +424,34 @@ def fetch_lookup_maps(cursor: pyodbc.Cursor) -> Tuple[Dict[str, Any], Dict[str, 
     for row in cursor.fetchall():
         evidence_by_key[(str(row.assignmentId), row.uploadedFileKey)] = str(row.id)
 
-    requirement_role_links = set()
-    cursor.execute("SELECT trainingRequirementId, roleId FROM training_requirement_roles_role")
-    for row in cursor.fetchall():
-        requirement_role_links.add((str(row.trainingRequirementId), str(row.roleId)))
+    requirement_group_links: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    try:
+        cursor.execute(
+            "SELECT requirementId, roleId, requiredLevel, mandatory FROM training_requirement_group"
+        )
+        for row in cursor.fetchall():
+            requirement_group_links[(str(row.requirementId), str(row.roleId))] = {
+                "requiredLevel": row.requiredLevel,
+                "mandatory": bool(row.mandatory),
+            }
+    except pyodbc.Error:
+        requirement_group_links = {}
+
+    person_group_links: Dict[str, set] = {}
+    try:
+        cursor.execute("SELECT personId, roleId FROM person_group")
+        for row in cursor.fetchall():
+            person_group_links.setdefault(str(row.personId), set()).add(str(row.roleId))
+    except pyodbc.Error:
+        person_group_links = {}
 
     return (
         roles_by_external,
         roles_by_name,
         persons_by_external,
         assignments_by_key,
-        requirement_role_links,
+        requirement_group_links,
+        person_group_links,
     )
 
 
@@ -554,26 +580,50 @@ def ensure_requirement(
     return requirement_id
 
 
-def ensure_role_requirement_link(
+def ensure_requirement_group_link(
     cursor: pyodbc.Cursor,
-    requirement_role_links: set,
+    requirement_group_links: Dict[Tuple[str, str], Dict[str, Any]],
     requirement_id: str,
     role_id: str,
+    required_level: int,
+    mandatory: bool,
 ) -> None:
     key = (requirement_id, role_id)
-    if key in requirement_role_links:
+    existing = requirement_group_links.get(key)
+    if existing:
+        updates = []
+        params: List[Any] = []
+        if existing.get("requiredLevel") != required_level:
+            updates.append("requiredLevel = ?")
+            params.append(required_level)
+        if existing.get("mandatory") != mandatory:
+            updates.append("mandatory = ?")
+            params.append(1 if mandatory else 0)
+        if updates:
+            params.extend([requirement_id, role_id])
+            cursor.execute(
+                f"UPDATE training_requirement_group SET {', '.join(updates)}, updatedAt = GETUTCDATE() "
+                "WHERE requirementId = ? AND roleId = ?",
+                *params,
+            )
+            existing.update({"requiredLevel": required_level, "mandatory": mandatory})
         return
+
     cursor.execute(
-        "INSERT INTO training_requirement_roles_role (trainingRequirementId, roleId) VALUES (?, ?)",
+        "INSERT INTO training_requirement_group "
+        "(id, requirementId, roleId, requiredLevel, mandatory, createdAt, updatedAt) "
+        "VALUES (NEWID(), ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
         requirement_id,
         role_id,
+        required_level,
+        1 if mandatory else 0,
     )
-    requirement_role_links.add(key)
+    requirement_group_links[key] = {"requiredLevel": required_level, "mandatory": mandatory}
 
 
 def remove_job_title_links(
     cursor: pyodbc.Cursor,
-    requirement_role_links: set,
+    requirement_group_links: Dict[Tuple[str, str], Dict[str, Any]],
 ) -> None:
     cursor.execute("SELECT id FROM role WHERE externalId LIKE 'planday-job-%'")
     role_ids = [str(row.id) for row in cursor.fetchall()]
@@ -585,13 +635,41 @@ def remove_job_title_links(
         chunk = role_ids[start : start + chunk_size]
         placeholders = ",".join("?" for _ in chunk)
         cursor.execute(
-            f"DELETE FROM training_requirement_roles_role WHERE roleId IN ({placeholders})",
+            f"DELETE FROM training_requirement_group WHERE roleId IN ({placeholders})",
             *chunk,
         )
 
-    requirement_role_links.difference_update(
-        {(req_id, role_id) for req_id, role_id in requirement_role_links if role_id in role_ids}
-    )
+    for key in list(requirement_group_links.keys()):
+        if key[1] in role_ids:
+            requirement_group_links.pop(key, None)
+
+
+def sync_person_groups(
+    cursor: pyodbc.Cursor,
+    person_group_links: Dict[str, set],
+    person_id: str,
+    role_ids: List[str],
+) -> None:
+    desired = set(role_ids)
+    existing = person_group_links.get(person_id, set())
+    to_add = desired - existing
+    to_remove = existing - desired
+
+    for role_id in to_add:
+        cursor.execute("INSERT INTO person_group (personId, roleId) VALUES (?, ?)", person_id, role_id)
+    if to_remove:
+        chunk_size = 200
+        remove_list = list(to_remove)
+        for start in range(0, len(remove_list), chunk_size):
+            chunk = remove_list[start : start + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            cursor.execute(
+                f"DELETE FROM person_group WHERE personId = ? AND roleId IN ({placeholders})",
+                person_id,
+                *chunk,
+            )
+
+    person_group_links[person_id] = desired
 
 
 def ensure_person(
@@ -761,10 +839,15 @@ def main() -> int:
     connection.autocommit = False
     cursor = connection.cursor()
 
-    roles_by_external, roles_by_name, persons_by_external, assignments_by_key, requirement_role_links = fetch_lookup_maps(
-        cursor
-    )
-    remove_job_title_links(cursor, requirement_role_links)
+    (
+        roles_by_external,
+        roles_by_name,
+        persons_by_external,
+        assignments_by_key,
+        requirement_group_links,
+        person_group_links,
+    ) = fetch_lookup_maps(cursor)
+    remove_job_title_links(cursor, requirement_group_links)
     requirements_by_name: Dict[str, Dict[str, Any]] = {}
     cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
     for row in cursor.fetchall():
@@ -823,6 +906,16 @@ def main() -> int:
         existing_before = persons_by_external.get(employee_id)
 
         employee_groups = sorted(extract_employee_groups(detail, employee))
+        group_role_ids: List[str] = []
+        for group_id in employee_groups:
+            group_role_id = ensure_group_role(
+                cursor,
+                roles_by_external,
+                roles_by_name,
+                group_id,
+                group_names.get(group_id),
+            )
+            group_role_ids.append(group_role_id)
         primary_group_id = employee_groups[0] if employee_groups else None
         if primary_group_id is not None:
             role_id = ensure_group_role(
@@ -851,6 +944,8 @@ def main() -> int:
             not resigned,
             role_id,
         )
+        if group_role_ids:
+            sync_person_groups(cursor, person_group_links, person_id, group_role_ids)
 
         if is_new:
             new_people += 1
@@ -897,7 +992,14 @@ def main() -> int:
                     category,
                     required_level,
                 )
-                ensure_role_requirement_link(cursor, requirement_role_links, requirement_id, group_role_id)
+                ensure_requirement_group_link(
+                    cursor,
+                    requirement_group_links,
+                    requirement_id,
+                    group_role_id,
+                    required_level,
+                    mandatory,
+                )
                 assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)
 
                 raw_value = lookup_custom_field(custom_field_values, course.get("course", ""))

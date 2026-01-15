@@ -3,6 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  ManyToMany,
+  JoinTable,
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
@@ -35,6 +37,14 @@ export class Person {
 
   @ManyToOne(() => Role, { eager: true })
   role!: Role;
+
+  @ManyToMany(() => Role)
+  @JoinTable({
+    name: "person_group",
+    joinColumn: { name: "personId", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "roleId", referencedColumnName: "id" },
+  })
+  groups!: Role[];
 
   @OneToMany(() => Assignment, (assignment) => assignment.person)
   assignments!: Assignment[];
