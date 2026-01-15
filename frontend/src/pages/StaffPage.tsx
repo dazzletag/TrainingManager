@@ -25,7 +25,7 @@ import {
 } from "@mui/material";
 import { useUserContext } from "../context/UserContext";
 import { fetchStaffDirectory, fetchStaffProfile, submitEvidence } from "../services/api";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 const formatDate = (value?: string | Date) =>
   value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-";
@@ -107,6 +107,33 @@ function StaffPage() {
   });
 
   const requirements: any[] = data?.requirements ?? [];
+
+  const categorized = useMemo(() => {
+    const essential = requirements.filter((item) => item.requirement.requiredLevel === 1);
+    const nice = requirements.filter((item) => item.requirement.requiredLevel === 2);
+    const home = requirements.filter((item) => item.requirement.requiredLevel === 3);
+    const additional = requirements.filter(
+      (item) =>
+        ![1, 2, 3].includes(item.requirement.requiredLevel) &&
+        (item.evidence?.length ?? 0) > 0,
+    );
+    const other = requirements.filter(
+      (item) =>
+        ![1, 2, 3].includes(item.requirement.requiredLevel) &&
+        (item.evidence?.length ?? 0) === 0,
+    );
+
+    const sortByName = (a: any, b: any) =>
+      (a.requirement.name ?? "").localeCompare(b.requirement.name ?? "");
+
+    return [
+      { label: "Essential", items: essential.sort(sortByName) },
+      { label: "Nice to have", items: nice.sort(sortByName) },
+      { label: "Home compliance", items: home.sort(sortByName) },
+      { label: "Additional evidence", items: additional.sort(sortByName) },
+      { label: "Other", items: other.sort(sortByName) },
+    ].filter((section) => section.items.length > 0);
+  }, [requirements]);
 
   const evidenceList = useMemo(() => flattenEvidence(requirements), [requirements]);
 
@@ -211,19 +238,28 @@ function StaffPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {requirements.map((item) => (
-                  <TableRow key={item.requirement.id}>
-                    <TableCell>{item.requirement.name}</TableCell>
-                    <TableCell>
-                      <StatusChip status={item.status} />
-                    </TableCell>
-                    <TableCell>
-                      {requiredLevelLabels[item.requirement.requiredLevel] ?? item.requirement.requiredLevel ?? "-"}
-                    </TableCell>
-                    <TableCell>{item.requirement.category ?? "-"}</TableCell>
-                    <TableCell>{formatDate(item.expiry)}</TableCell>
-                    <TableCell>{item.evidence.length}</TableCell>
-                  </TableRow>
+                {categorized.map((section) => (
+                  <Fragment key={section.label}>
+                    <TableRow key={section.label}>
+                      <TableCell colSpan={6} sx={{ bgcolor: "grey.100" }}>
+                        <Typography variant="subtitle2">{section.label}</Typography>
+                      </TableCell>
+                    </TableRow>
+                    {section.items.map((item: any) => (
+                      <TableRow key={item.requirement.id}>
+                        <TableCell>{item.requirement.name}</TableCell>
+                        <TableCell>
+                          <StatusChip status={item.status} />
+                        </TableCell>
+                        <TableCell>
+                          {requiredLevelLabels[item.requirement.requiredLevel] ?? item.requirement.requiredLevel ?? "-"}
+                        </TableCell>
+                        <TableCell>{item.requirement.category ?? "-"}</TableCell>
+                        <TableCell>{formatDate(item.expiry)}</TableCell>
+                        <TableCell>{item.evidence.length}</TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
