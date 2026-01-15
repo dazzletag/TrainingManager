@@ -11,6 +11,7 @@ This job reads employee custom training fields from Planday and upserts them int
 - `PLANDAY_HR_BASE_URL` (optional, default `https://openapi.planday.com/hr/v1`)
 - `PLANDAY_DEFAULT_VALIDITY_MONTHS` (optional, default `12`)
 - `PLANDAY_COURSE_VALIDITY_FILE` (optional path to a JSON map of course name -> validity months)
+- `PLANDAY_TRAINING_MATRIX_FILE` (optional, default points at `trainingRqmt.xlsx`)
 - `PLANDAY_DEFAULT_ROLE_NAME` (optional, default `Imported Staff`)
 
 - `DB_HOST`

@@ -10,10 +10,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pyodbc
 import requests
+import pandas as pd
 
 DEFAULT_PAGE_SIZE = 50
 DEFAULT_VALIDITY_MONTHS = int(os.getenv("PLANDAY_DEFAULT_VALIDITY_MONTHS", "12"))
 STATUS_FIELDS = {"Has Resigned", "On Parental Leave"}
+ONE_OFF_YEARS = {20, 50}
 
 
 def setup_logging() -> None:
@@ -72,6 +74,60 @@ def add_months(value: dt.datetime, months: int) -> dt.datetime:
     month = month % 12 + 1
     day = min(value.day, calendar.monthrange(year, month)[1])
     return value.replace(year=year, month=month, day=day)
+
+
+def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, str]]:
+    path = os.getenv(
+        "PLANDAY_TRAINING_MATRIX_FILE",
+        r"C:\Users\Darren\OneDrive - Bristol Care Homes\Desktop\trainingRqmt.xlsx",
+    )
+    if not os.path.exists(path):
+        raise RuntimeError(f"Training matrix not found at {path}")
+
+    sheet1 = pd.read_excel(path, sheet_name="Sheet1")
+    sheet2 = pd.read_excel(path, sheet_name="Sheet2")
+
+    group_names = {}
+    for _, row in sheet2.iterrows():
+        try:
+            group_id = int(row.get("id"))
+        except (TypeError, ValueError):
+            continue
+        group_names[group_id] = str(row.get("name"))
+
+    required: Dict[int, List[Dict[str, Any]]] = {}
+    for _, row in sheet1.iterrows():
+        group_id = row.get("EmployeeGroup")
+        if pd.isna(group_id):
+            continue
+        try:
+            group_id = int(group_id)
+        except (TypeError, ValueError):
+            continue
+
+        course = str(row.get("Compliant Title") or row.get("Course") or "").strip()
+        if not course:
+            continue
+        period_years = row.get("Period")
+        try:
+            period_years = int(period_years)
+        except (TypeError, ValueError):
+            period_years = 0
+        needed = row.get("Needed")
+        try:
+            needed = int(needed)
+        except (TypeError, ValueError):
+            needed = 1
+
+        required.setdefault(group_id, []).append(
+            {
+                "course": course,
+                "needed": needed,
+                "period_years": period_years,
+            }
+        )
+
+    return required, group_names
 
 
 def load_validity_overrides() -> Dict[str, int]:
@@ -204,6 +260,43 @@ def bool_value(value: Any) -> bool:
     return False
 
 
+def extract_employee_groups(detail: Dict[str, Any], summary: Dict[str, Any]) -> List[int]:
+    groups = detail.get("employeeGroups") or summary.get("employeeGroups") or []
+    if isinstance(groups, list):
+        ids: List[int] = []
+        for item in groups:
+            if isinstance(item, dict):
+                value = item.get("id")
+            else:
+                value = item
+            try:
+                ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return ids
+    return []
+
+
+def build_custom_field_map(fields: List[Dict[str, Any]]) -> Dict[str, Any]:
+    values: Dict[str, Any] = {}
+    for field in fields:
+        name = field.get("name")
+        if not name:
+            continue
+        values[name] = field.get("value")
+    return values
+
+
+def lookup_custom_field(values: Dict[str, Any], course_label: str) -> Any:
+    if course_label in values:
+        return values[course_label]
+    normalized = normalize_course_name(course_label)
+    for key, value in values.items():
+        if normalize_course_name(str(key)) == normalized:
+            return value
+    return None
+
+
 def build_db_connection() -> pyodbc.Connection:
     host = os.getenv("DB_HOST")
     port = os.getenv("DB_PORT", "1433")
@@ -289,8 +382,6 @@ def ensure_role(
     cursor: pyodbc.Cursor,
     roles_by_external: Dict[str, Dict[str, Any]],
     roles_by_name: Dict[str, Dict[str, Any]],
-    requirements_by_name: Dict[str, Dict[str, Any]],
-    requirement_role_links: set,
     job_title: Optional[str],
 ) -> str:
     role_name = job_title.strip() if job_title else os.getenv("PLANDAY_DEFAULT_ROLE_NAME", "Imported Staff")
@@ -311,52 +402,54 @@ def ensure_role(
     roles_by_external[external_id] = {"id": role_id, "name": role_name}
     roles_by_name[role_name] = {"id": role_id, "externalId": external_id}
 
-    for requirement in requirements_by_name.values():
-        key = (str(requirement["id"]), role_id)
-        if key not in requirement_role_links:
-            cursor.execute(
-                "INSERT INTO training_requirement_roles_role (trainingRequirementId, roleId) VALUES (?, ?)",
-                requirement["id"],
-                role_id,
-            )
-            requirement_role_links.add(key)
-
     return role_id
 
 
 def ensure_requirement(
     cursor: pyodbc.Cursor,
     requirements_by_name: Dict[str, Dict[str, Any]],
-    requirement_role_links: set,
-    roles_by_name: Dict[str, Dict[str, Any]],
     name: str,
     validity_months: int,
+    mandatory: bool,
+    category: Optional[str],
 ) -> str:
     if name in requirements_by_name:
         return str(requirements_by_name[name]["id"])
 
+    description = f"Imported from Planday training matrix ({name})"
+    if category:
+        description = f"{description}. Category: {category}"
+
     cursor.execute(
         "INSERT INTO training_requirement (id, name, description, validityPeriodMonths, mandatory, createdAt, updatedAt) "
-        "VALUES (NEWID(), ?, ?, ?, 1, GETUTCDATE(), GETUTCDATE())",
+        "VALUES (NEWID(), ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
         name,
-        f"Imported from Planday custom field {name}",
+        description,
         validity_months,
+        1 if mandatory else 0,
     )
     cursor.execute("SELECT id FROM training_requirement WHERE name = ?", name)
     requirement_id = str(cursor.fetchone().id)
     requirements_by_name[name] = {"id": requirement_id, "validityPeriodMonths": validity_months}
 
-    for role in roles_by_name.values():
-        key = (requirement_id, str(role["id"]))
-        if key not in requirement_role_links:
-            cursor.execute(
-                "INSERT INTO training_requirement_roles_role (trainingRequirementId, roleId) VALUES (?, ?)",
-                requirement_id,
-                role["id"],
-            )
-            requirement_role_links.add(key)
-
     return requirement_id
+
+
+def ensure_role_requirement_link(
+    cursor: pyodbc.Cursor,
+    requirement_role_links: set,
+    requirement_id: str,
+    role_id: str,
+) -> None:
+    key = (requirement_id, role_id)
+    if key in requirement_role_links:
+        return
+    cursor.execute(
+        "INSERT INTO training_requirement_roles_role (trainingRequirementId, roleId) VALUES (?, ?)",
+        requirement_id,
+        role_id,
+    )
+    requirement_role_links.add(key)
 
 
 def ensure_person(
@@ -514,6 +607,7 @@ def log_audit(cursor: pyodbc.Cursor, what: str, why: str) -> None:
 def main() -> int:
     setup_logging()
     validity_overrides = load_validity_overrides()
+    training_matrix, group_names = load_training_matrix()
 
     token = get_access_token()
     session = build_session(token)
@@ -579,8 +673,6 @@ def main() -> int:
             cursor,
             roles_by_external,
             roles_by_name,
-            requirements_by_name,
-            requirement_role_links,
             detail.get("jobTitle") or employee.get("jobTitle"),
         )
 
@@ -611,42 +703,57 @@ def main() -> int:
             if not parental_leave and existing_before.get("employmentStatus") == "Parental Leave":
                 log_audit(cursor, "person-returned", f"{full_name} marked as returned from parental leave")
 
-        for field in fields:
-            name = field.get("name") or ""
-            if name in STATUS_FIELDS:
-                continue
-            value = field.get("value")
-            parsed_date = parse_date(value)
-            if not parsed_date:
-                continue
-            normalized = normalize_course_name(name)
-            validity_months = validity_overrides.get(normalized, DEFAULT_VALIDITY_MONTHS)
-            requirement_id = ensure_requirement(
-                cursor,
-                requirements_by_name,
-                requirement_role_links,
-                roles_by_name,
-                normalized,
-                validity_months,
-            )
-            assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)
-            if is_due_field(name):
-                valid_to = parsed_date
-                valid_from = add_months(parsed_date, -validity_months)
-            else:
-                valid_from = parsed_date
-                valid_to = add_months(parsed_date, validity_months)
-            uploaded_file_key = f"planday:{slugify(name)}"
-            upsert_evidence(
-                cursor,
-                evidence_by_key,
-                assignment_id,
-                uploaded_file_key,
-                valid_from,
-                valid_to,
-                100,
-            )
-            training_updates += 1
+        custom_field_values = build_custom_field_map(fields)
+        employee_groups = extract_employee_groups(detail, employee)
+
+        for group_id in employee_groups:
+            course_rows = training_matrix.get(group_id, [])
+            for course in course_rows:
+                course_name = normalize_course_name(course["course"])
+                period_years = course.get("period_years", 0)
+                is_one_off = period_years in ONE_OFF_YEARS
+                validity_months = validity_overrides.get(course_name, max(period_years * 12, DEFAULT_VALIDITY_MONTHS))
+                category = "one-off" if is_one_off else None
+                needed = course.get("needed", 1)
+                mandatory = needed in (1, 3)
+
+                requirement_id = ensure_requirement(
+                    cursor,
+                    requirements_by_name,
+                    course_name,
+                    validity_months,
+                    mandatory,
+                    category,
+                )
+                ensure_role_requirement_link(cursor, requirement_role_links, requirement_id, role_id)
+                assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)
+
+                raw_value = lookup_custom_field(custom_field_values, course.get("course", ""))
+                parsed_date = parse_date(raw_value)
+                if not parsed_date:
+                    continue
+
+                if is_due_field(course.get("course", "")):
+                    valid_to = parsed_date
+                    valid_from = add_months(parsed_date, -validity_months)
+                else:
+                    valid_from = parsed_date
+                    valid_to = add_months(parsed_date, validity_months)
+
+                if is_one_off and valid_to < dt.datetime.now(dt.UTC):
+                    valid_to = add_months(valid_from, 1200)
+
+                uploaded_file_key = f"planday:{slugify(course.get('course', 'training'))}"
+                upsert_evidence(
+                    cursor,
+                    evidence_by_key,
+                    assignment_id,
+                    uploaded_file_key,
+                    valid_from,
+                    valid_to,
+                    100,
+                )
+                training_updates += 1
 
         processed += 1
         if processed % 25 == 0 or processed == len(employees):

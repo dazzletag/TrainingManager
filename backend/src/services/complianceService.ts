@@ -25,6 +25,15 @@ export function evaluateRequirement(
     ? new Date(Math.max(...validEntries.map((item) => item.validTo.getTime())))
     : undefined;
 
+  if (!requirement.mandatory) {
+    return {
+      requirement,
+      status: "compliant",
+      expiry,
+      evidence,
+    };
+  }
+
   if (!validEntries.length) {
     return {
       requirement,
