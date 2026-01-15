@@ -9,14 +9,7 @@ import { assignToTrainingShift } from "../services/plandayScheduling";
 const router = Router();
 
 function listRequirements(person: Person) {
-  const requirementSet = new Map<string, any>();
-  for (const assignment of person.assignments ?? []) {
-    requirementSet.set(assignment.requirement.id, assignment.requirement);
-  }
-  for (const requirement of person.role?.trainingRequirements ?? []) {
-    requirementSet.set(requirement.id, requirement);
-  }
-  return Array.from(requirementSet.values());
+  return (person.assignments ?? []).map((assignment) => assignment.requirement);
 }
 
 function summarizeCompliance(person: Person) {

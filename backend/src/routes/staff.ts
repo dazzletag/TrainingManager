@@ -92,15 +92,7 @@ router.get("/profile", async (req, res) => {
   }
 
   const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
-  const requirementSet = new Map<string, TrainingRequirement>();
-  for (const assignment of person.assignments ?? []) {
-    requirementSet.set(assignment.requirement.id, assignment.requirement);
-  }
-  for (const requirement of person.role?.trainingRequirements ?? []) {
-    requirementSet.set(requirement.id, requirement);
-  }
-  const requirementList = Array.from(requirementSet.values());
-
+  const requirementList = (person.assignments ?? []).map((assignment) => assignment.requirement);
   const requirements = requirementList.map((requirement) =>
     evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
   );
@@ -138,15 +130,7 @@ router.get("/:personId/requirements", async (req, res) => {
   }
 
   const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
-  const requirementSet = new Map<string, TrainingRequirement>();
-  for (const assignment of person.assignments ?? []) {
-    requirementSet.set(assignment.requirement.id, assignment.requirement);
-  }
-  for (const requirement of person.role?.trainingRequirements ?? []) {
-    requirementSet.set(requirement.id, requirement);
-  }
-  const requirementList = Array.from(requirementSet.values());
-
+  const requirementList = (person.assignments ?? []).map((assignment) => assignment.requirement);
   const requirements = requirementList.map((requirement) =>
     evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
   );

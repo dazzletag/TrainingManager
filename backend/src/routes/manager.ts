@@ -22,21 +22,19 @@ router.get("/compliance", async (req, res) => {
 
   for (const person of people) {
     const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
-    const requirementSet = new Map<string, any>();
-    for (const assignment of person.assignments ?? []) {
-      requirementSet.set(assignment.requirement.id, assignment.requirement);
-    }
-    for (const requirement of person.role?.trainingRequirements ?? []) {
-      requirementSet.set(requirement.id, requirement);
-    }
-    const requirementResults = Array.from(requirementSet.values()).map((requirement) =>
-      evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
+    const requirementResults = (person.assignments ?? []).map((assignment) =>
+      evaluateRequirement(assignment.requirement, assignmentMap.get(assignment.requirement.id)),
+    );
+    const requirementResultsFinal = Array.from(
+      new Map(requirementResults.map((item) => [item.requirement.id, item])).values(),
     );
 
-    const compliantCount = requirementResults.filter((item) => item.status === "compliant").length;
-    const atRiskCount = requirementResults.filter((item) => item.status === "at-risk").length;
-    const missingCount = requirementResults.filter((item) => item.status === "missing").length;
-    const complianceRate = requirementResults.length ? (compliantCount / requirementResults.length) * 100 : 0;
+    const compliantCount = requirementResultsFinal.filter((item) => item.status === "compliant").length;
+    const atRiskCount = requirementResultsFinal.filter((item) => item.status === "at-risk").length;
+    const missingCount = requirementResultsFinal.filter((item) => item.status === "missing").length;
+    const complianceRate = requirementResultsFinal.length
+      ? (compliantCount / requirementResultsFinal.length) * 100
+      : 0;
 
     const bucketKey = `${person.homeLocation}|${person.role.name}`;
     if (!summaries[bucketKey]) {
@@ -53,7 +51,7 @@ router.get("/compliance", async (req, res) => {
 
     const bucket = summaries[bucketKey];
     bucket.totalPeople += 1;
-    bucket.totalRequirements += requirementResults.length;
+    bucket.totalRequirements += requirementResultsFinal.length;
     bucket.totalComplianceRate += complianceRate;
     if (atRiskCount) bucket.atRiskPeople += 1;
     if (missingCount) bucket.missingPeople += 1;
@@ -86,18 +84,14 @@ router.get("/at-risk", async (req, res) => {
 
   for (const person of people) {
     const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
-    const requirementSet = new Map<string, any>();
-    for (const assignment of person.assignments ?? []) {
-      requirementSet.set(assignment.requirement.id, assignment.requirement);
-    }
-    for (const requirement of person.role?.trainingRequirements ?? []) {
-      requirementSet.set(requirement.id, requirement);
-    }
-    const requirementResults = Array.from(requirementSet.values()).map((requirement) =>
-      evaluateRequirement(requirement, assignmentMap.get(requirement.id)),
+    const requirementResults = (person.assignments ?? []).map((assignment) =>
+      evaluateRequirement(assignment.requirement, assignmentMap.get(assignment.requirement.id)),
+    );
+    const requirementResultsFinal = Array.from(
+      new Map(requirementResults.map((item) => [item.requirement.id, item])).values(),
     );
 
-    const needsAttention = requirementResults.some((result) => result.status !== "compliant");
+    const needsAttention = requirementResultsFinal.some((result) => result.status !== "compliant");
 
     if (needsAttention) {
       atRisk.push({
@@ -107,7 +101,7 @@ router.get("/at-risk", async (req, res) => {
           role: person.role.name,
           homeLocation: person.homeLocation,
         },
-        requirements: requirementResults,
+        requirements: requirementResultsFinal,
       });
     }
   }
