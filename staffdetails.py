@@ -439,6 +439,36 @@ def ensure_role(
     return role_id
 
 
+def ensure_group_role(
+    cursor: pyodbc.Cursor,
+    roles_by_external: Dict[str, Dict[str, Any]],
+    roles_by_name: Dict[str, Dict[str, Any]],
+    group_id: int,
+    group_name: Optional[str],
+) -> str:
+    name = group_name.strip() if group_name else f"Group {group_id}"
+    external_id = f"planday-group-{group_id}"
+    if external_id in roles_by_external:
+        return roles_by_external[external_id]["id"]
+    if name in roles_by_name:
+        return roles_by_name[name]["id"]
+
+    cursor.execute(
+        "INSERT INTO role (id, externalId, name, category, description, createdAt, updatedAt) "
+        "VALUES (NEWID(), ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
+        external_id,
+        name,
+        "Employee Group",
+        "Imported from Planday employee group",
+    )
+    cursor.execute("SELECT id FROM role WHERE externalId = ?", external_id)
+    role_id = str(cursor.fetchone().id)
+    roles_by_external[external_id] = {"id": role_id, "name": name}
+    roles_by_name[name] = {"id": role_id, "externalId": external_id}
+
+    return role_id
+
+
 def ensure_requirement(
     cursor: pyodbc.Cursor,
     requirements_by_name: Dict[str, Dict[str, Any]],
@@ -751,12 +781,23 @@ def main() -> int:
 
         existing_before = persons_by_external.get(employee_id)
 
-        role_id = ensure_role(
-            cursor,
-            roles_by_external,
-            roles_by_name,
-            detail.get("jobTitle") or employee.get("jobTitle"),
-        )
+        employee_groups = sorted(extract_employee_groups(detail, employee))
+        primary_group_id = employee_groups[0] if employee_groups else None
+        if primary_group_id is not None:
+            role_id = ensure_group_role(
+                cursor,
+                roles_by_external,
+                roles_by_name,
+                primary_group_id,
+                group_names.get(primary_group_id),
+            )
+        else:
+            role_id = ensure_role(
+                cursor,
+                roles_by_external,
+                roles_by_name,
+                detail.get("jobTitle") or employee.get("jobTitle"),
+            )
 
         person_id, is_new = ensure_person(
             cursor,
@@ -786,7 +827,6 @@ def main() -> int:
                 log_audit(cursor, "person-returned", f"{full_name} marked as returned from parental leave")
 
         custom_field_values = build_custom_field_map(fields)
-        employee_groups = extract_employee_groups(detail, employee)
 
         for group_id in employee_groups:
             course_rows = training_matrix.get(group_id, [])
