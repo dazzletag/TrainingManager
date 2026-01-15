@@ -23,10 +23,20 @@ export function fetchStaffProfile(externalId: string, role: string, email: strin
   });
 }
 
-export function fetchStaffDirectory(role: string, email: string, limit = 1) {
+export function fetchStaffDirectory(
+  role: string,
+  email: string,
+  options?: { limit?: number; search?: string; home?: string; includeHomes?: boolean },
+) {
+  const params: Record<string, string | number | boolean> = {};
+  if (options?.limit) params.limit = options.limit;
+  if (options?.search) params.search = options.search;
+  if (options?.home) params.home = options.home;
+  if (options?.includeHomes) params.includeHomes = true;
+
   return apiClient.get("/staff/directory", {
     headers: withHeaders(role, email),
-    params: { limit },
+    params,
   });
 }
 

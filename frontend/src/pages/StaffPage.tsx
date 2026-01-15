@@ -5,7 +5,11 @@ import {
   Button,
   CircularProgress,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -20,8 +24,8 @@ import {
   ListItemText,
 } from "@mui/material";
 import { useUserContext } from "../context/UserContext";
-import { fetchStaffProfile, submitEvidence } from "../services/api";
-import { useMemo, useState } from "react";
+import { fetchStaffDirectory, fetchStaffProfile, submitEvidence } from "../services/api";
+import { useEffect, useMemo, useState } from "react";
 
 const formatDate = (value?: string | Date) =>
   value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-";
@@ -52,7 +56,7 @@ function flattenEvidence(requirements: any[]) {
 }
 
 function StaffPage() {
-  const { role, personExternalId, userEmail } = useUserContext();
+  const { role, personExternalId, setPersonExternalId, userEmail } = useUserContext();
   const [form, setForm] = useState({
     type: "",
     source: "",
@@ -62,6 +66,27 @@ function StaffPage() {
     verifiedBy: userEmail,
     confidenceLevel: 80,
     requirementId: "",
+  });
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [homeFilter, setHomeFilter] = useState("all");
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setSearchTerm(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const { data: directoryData, isFetching: isDirectoryFetching } = useQuery({
+    queryKey: ["staffDirectory", role, userEmail, searchTerm, homeFilter],
+    queryFn: () =>
+      fetchStaffDirectory(role, userEmail, {
+        limit: 500,
+        search: searchTerm || undefined,
+        home: homeFilter === "all" ? undefined : homeFilter,
+        includeHomes: true,
+      }).then((response) => response.data),
   });
 
   const { data, isFetching, error, refetch } = useQuery({
@@ -89,8 +114,76 @@ function StaffPage() {
     (item) => item.expiry && new Date(item.expiry) > new Date(),
   );
 
+  const staffOptions = useMemo(() => {
+    const people = directoryData?.people ?? [];
+    return [...people].sort((a: any, b: any) => {
+      const aLast = a.fullName?.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+      const bLast = b.fullName?.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+      const lastCompare = aLast.localeCompare(bLast);
+      if (lastCompare !== 0) return lastCompare;
+      return (a.fullName ?? "").localeCompare(b.fullName ?? "");
+    });
+  }, [directoryData?.people]);
+
+  const homeOptions = directoryData?.homes ?? [];
+  const hasSelectedPerson = staffOptions.some((person: any) => person.externalId === personExternalId);
+
   return (
     <Stack direction="column" spacing={3}>
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6">Staff Search</Typography>
+        <Stack spacing={2} mt={2}>
+          <TextField
+            label="Search staff"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search by name, email, or ID"
+            size="small"
+          />
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel id="home-filter-label">Home</InputLabel>
+              <Select
+                labelId="home-filter-label"
+                value={homeFilter}
+                label="Home"
+                onChange={(event) => setHomeFilter(event.target.value)}
+              >
+                <MenuItem value="all">All homes</MenuItem>
+                {homeOptions.map((home: string) => (
+                  <MenuItem key={home} value={home}>
+                    {home}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 320 }}>
+              <InputLabel id="staff-select-label">Staff member</InputLabel>
+              <Select
+                labelId="staff-select-label"
+                value={personExternalId || ""}
+                label="Staff member"
+                onChange={(event) => setPersonExternalId(event.target.value)}
+                disabled={isDirectoryFetching}
+              >
+                {!hasSelectedPerson && personExternalId && (
+                  <MenuItem value={personExternalId}>{personExternalId}</MenuItem>
+                )}
+                {staffOptions.map((person: any) => (
+                  <MenuItem key={person.externalId} value={person.externalId}>
+                    {person.fullName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+          {isDirectoryFetching && (
+            <Typography variant="caption" color="text.secondary">
+              Updating staff list...
+            </Typography>
+          )}
+        </Stack>
+      </Paper>
       <Paper sx={{ p: 3, position: "relative" }}>
         {isFetching && (
           <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", bgcolor: "rgba(255,255,255,0.6)" }}>

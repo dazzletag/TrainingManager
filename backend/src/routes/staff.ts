@@ -12,23 +12,58 @@ const router = Router();
 router.get("/directory", async (req, res) => {
   const limitRaw = req.query.limit as string | undefined;
   const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : 10;
-  const limit = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 10, 1), 100);
+  const limit = Math.min(Math.max(Number.isFinite(limitParsed) ? limitParsed : 10, 1), 2000);
+  const home = (req.query.home as string | undefined)?.trim() || undefined;
+  const searchRaw = (req.query.search as string | undefined)?.trim() || undefined;
+  const includeHomes = req.query.includeHomes === "true";
 
   const personRepo = AppDataSource.getRepository(Person);
-  const people = await personRepo.find({
-    select: {
-      id: true,
-      externalId: true,
-      fullName: true,
-      email: true,
-      employmentStatus: true,
-      homeLocation: true,
-    },
-    order: { fullName: "ASC" },
-    take: limit,
+  const query = personRepo
+    .createQueryBuilder("person")
+    .select([
+      "person.id",
+      "person.externalId",
+      "person.fullName",
+      "person.email",
+      "person.employmentStatus",
+      "person.homeLocation",
+    ])
+    .orderBy("person.fullName", "ASC")
+    .take(limit);
+
+  if (home) {
+    query.andWhere("person.homeLocation = :home", { home });
+  }
+
+  if (searchRaw) {
+    const search = `%${searchRaw}%`;
+    query.andWhere(
+      "(person.fullName LIKE :search OR person.email LIKE :search OR person.externalId LIKE :search)",
+      { search },
+    );
+  }
+
+  const people = await query.getMany();
+  const sortedPeople = [...people].sort((a, b) => {
+    const aLast = a.fullName?.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+    const bLast = b.fullName?.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+    const lastCompare = aLast.localeCompare(bLast);
+    if (lastCompare !== 0) return lastCompare;
+    return (a.fullName ?? "").localeCompare(b.fullName ?? "");
   });
 
-  res.json({ people });
+  let homes: string[] | undefined;
+  if (includeHomes) {
+    const homeRows = await personRepo
+      .createQueryBuilder("person")
+      .select("DISTINCT person.homeLocation", "homeLocation")
+      .where("person.homeLocation IS NOT NULL AND person.homeLocation <> ''")
+      .orderBy("person.homeLocation", "ASC")
+      .getRawMany();
+    homes = homeRows.map((row) => row.homeLocation).filter(Boolean);
+  }
+
+  res.json({ people: sortedPeople, homes });
 });
 
 router.get("/profile", async (req, res) => {

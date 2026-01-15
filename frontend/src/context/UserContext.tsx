@@ -29,7 +29,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
 
     let isActive = true;
-    fetchStaffDirectory(role, userEmail, 1)
+    fetchStaffDirectory(role, userEmail, { limit: 1 })
       .then((response) => {
         const candidate = response.data?.people?.[0];
         if (isActive && candidate?.externalId) {
