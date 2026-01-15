@@ -8,9 +8,20 @@ import { assignToTrainingShift } from "../services/plandayScheduling";
 
 const router = Router();
 
+function listRequirements(person: Person) {
+  const requirementSet = new Map<string, any>();
+  for (const assignment of person.assignments ?? []) {
+    requirementSet.set(assignment.requirement.id, assignment.requirement);
+  }
+  for (const requirement of person.role?.trainingRequirements ?? []) {
+    requirementSet.set(requirement.id, requirement);
+  }
+  return Array.from(requirementSet.values());
+}
+
 function summarizeCompliance(person: Person) {
   const requirementMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
-  const requirements = person.role.trainingRequirements.map((requirement) =>
+  const requirements = listRequirements(person).map((requirement) =>
     evaluateRequirement(requirement, requirementMap.get(requirement.id)),
   );
   const hasIssue = requirements.some((requirement) => requirement.status !== "compliant");

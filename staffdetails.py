@@ -847,6 +847,13 @@ def main() -> int:
 
         for group_id in employee_groups:
             course_rows = training_matrix.get(group_id, [])
+            group_role_id = ensure_group_role(
+                cursor,
+                roles_by_external,
+                roles_by_name,
+                group_id,
+                group_names.get(group_id),
+            )
             for course in course_rows:
                 course_name = normalize_course_name(course["course"])
                 period_years = course.get("period_years", 0)
@@ -866,7 +873,7 @@ def main() -> int:
                     category,
                     required_level,
                 )
-                ensure_role_requirement_link(cursor, requirement_role_links, requirement_id, role_id)
+                ensure_role_requirement_link(cursor, requirement_role_links, requirement_id, group_role_id)
                 assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)
 
                 raw_value = lookup_custom_field(custom_field_values, course.get("course", ""))
