@@ -74,6 +74,12 @@ type PublishFeedback = {
 };
 
 const homePalette = ["#e3f2fd", "#f3e5f5", "#e8f5e9", "#fff3e0", "#fbe9e7"];
+const homeColorOverrides: Record<string, string> = {
+  "Quarry House": "#648133",
+  "Beech House": "#156F9F",
+  "Field House": "#A61D5F",
+  "Glebe House": "#603863",
+};
 
 function TrainingSessionBuilder() {
   const { role, userEmail } = useUserContext();
@@ -141,7 +147,7 @@ function TrainingSessionBuilder() {
     selectedSession?.day1Assignments.forEach((assignment) => homes.add(assignment.person.home ?? "Unknown"));
     selectedSession?.day2Assignments.forEach((assignment) => homes.add(assignment.person.home ?? "Unknown"));
     Array.from(homes).forEach((home, index) => {
-      map.set(home, homePalette[index % homePalette.length]);
+      map.set(home, homeColorOverrides[home] ?? homePalette[index % homePalette.length]);
     });
     return map;
   }, [unassigned, selectedSession]);
@@ -194,6 +200,10 @@ function TrainingSessionBuilder() {
     value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "-";
 
   const skippedResults = publishFeedback?.results.filter((result) => !result.moved) ?? [];
+  const mandatoryUnassigned = useMemo(
+    () => unassigned.filter((person) => person.status !== "compliant"),
+    [unassigned],
+  );
 
   const findPersonName = (personId: string) => {
     const assignments: SessionAssignment[] = [];
@@ -357,17 +367,24 @@ function TrainingSessionBuilder() {
                           alignItems: "center",
                           px: 2,
                           py: 1,
-                          borderLeft: 4,
-                          borderColor: homeColorMap.get(assignment.person.home ?? "Unknown") ?? "primary.main",
+                          borderRight: "7px solid #0078D7",
+                          backgroundColor: homeColorMap.get(assignment.person.home ?? "Unknown") ?? "grey.600",
+                          color: "common.white",
                         }}
                       >
                         <Box>
-                          <Typography variant="body1">{assignment.person.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {assignment.person.role} · {assignment.person.status}
+                          <Typography variant="body1" sx={{ color: "common.white" }}>
+                            {assignment.person.name}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
+                            {assignment.person.role} � {assignment.person.status}
                           </Typography>
                         </Box>
-                        <Chip label={assignment.person.status} size="small" />
+                        <Chip
+                          label={assignment.person.status}
+                          size="small"
+                          sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "common.white" }}
+                        />
                       </Paper>
                     ),
                   )}
@@ -391,7 +408,7 @@ function TrainingSessionBuilder() {
                 gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
               }}
             >
-              {unassigned.map((person) => (
+              {mandatoryUnassigned.map((person) => (
                 <Paper
                   key={person.id}
                   draggable
@@ -401,25 +418,32 @@ function TrainingSessionBuilder() {
                   sx={{
                     px: 2,
                     py: 1,
-                    borderLeft: 4,
-                    borderColor: homeColorMap.get(person.home) ?? "divider",
+                    borderRight: "7px solid #0078D7",
+                    backgroundColor: homeColorMap.get(person.home) ?? "grey.600",
+                    color: "common.white",
                   }}
                 >
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Box>
-                      <Typography variant="body1">{person.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {person.role} · due {person.nextDue ? formatDate(person.nextDue) : "no date"}
+                      <Typography variant="body1" sx={{ color: "common.white" }}>
+                        {person.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
+                        {person.role} � due {person.nextDue ? formatDate(person.nextDue) : "no date"}
                       </Typography>
                     </Box>
-                    <Chip label={person.status} size="small" />
+                    <Chip
+                      label={person.status}
+                      size="small"
+                      sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "common.white" }}
+                    />
                   </Stack>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
                     Home: {person.home} · last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "–"}
                   </Typography>
                 </Paper>
               ))}
-              {!unassigned.length && (
+              {!mandatoryUnassigned.length && (
                 <Typography color="text.secondary">Everyone has been allocated.</Typography>
               )}
             </Box>
