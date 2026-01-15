@@ -210,6 +210,36 @@ def fetch_employees(session: requests.Session) -> List[Dict[str, Any]]:
     return employees
 
 
+def fetch_departments(session: requests.Session) -> Dict[int, str]:
+    base_url = os.getenv("PLANDAY_HR_BASE_URL", "https://openapi.planday.com/hr/v1.0")
+    departments: Dict[int, str] = {}
+    offset = 0
+    total = None
+
+    while total is None or offset < total:
+        params = {"offset": offset, "limit": DEFAULT_PAGE_SIZE}
+        response = session.get(f"{base_url}/departments", params=params, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+        page = payload.get("data", [])
+        paging = payload.get("paging", {})
+        total = paging.get("total", len(page))
+        for item in page:
+            try:
+                dept_id = int(item.get("id"))
+            except (TypeError, ValueError):
+                continue
+            name = str(item.get("name") or "").strip()
+            if name:
+                departments[dept_id] = name
+        offset += len(page)
+        if not page:
+            break
+        logging.info("Fetched %s/%s departments", offset, total)
+
+    return departments
+
+
 def fetch_employee_detail(
     session: requests.Session, employee_id: str, retries: int = 3
 ) -> Dict[str, Any]:
@@ -654,6 +684,7 @@ def main() -> int:
     token = get_access_token()
     session = build_session(token)
     employees = fetch_employees(session)
+    departments_by_id = fetch_departments(session)
     logging.info("Total employees fetched: %s", len(employees))
 
     connection = build_db_connection()
@@ -710,7 +741,13 @@ def main() -> int:
             employment_status = "Resigned"
         elif parental_leave:
             employment_status = "Parental Leave"
-        home_location = employee.get("homeLocation") or detail.get("homeLocation") or str(employee.get("primaryDepartmentId") or "")
+        primary_department_id = employee.get("primaryDepartmentId") or detail.get("primaryDepartmentId")
+        home_location = ""
+        if primary_department_id is not None:
+            try:
+                home_location = departments_by_id.get(int(primary_department_id), "")
+            except (TypeError, ValueError):
+                home_location = ""
 
         existing_before = persons_by_external.get(employee_id)
 
