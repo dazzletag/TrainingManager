@@ -22,8 +22,14 @@ export class TrainingRequirement {
   @Column("int")
   validityPeriodMonths!: number;
 
+  @Column("int", { default: 1 })
+  requiredLevel!: number;
+
   @Column({ default: true })
   mandatory!: boolean;
+
+  @Column({ nullable: true })
+  category?: string;
 
   @ManyToMany(() => Role, (role) => role.trainingRequirements, {
     cascade: ["insert"],

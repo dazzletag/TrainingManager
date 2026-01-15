@@ -59,6 +59,12 @@ export function createTrainingRequirement(body: any, role: string, email: string
   });
 }
 
+export function updateTrainingRequirement(id: string, body: any, role: string, email: string) {
+  return apiClient.put(`/admin/training-requirements/${id}`, body, {
+    headers: withHeaders(role, email),
+  });
+}
+
 export function fetchAuditTrail(role: string, email: string) {
   return apiClient.get("/admin/audit", {
     headers: withHeaders(role, email),

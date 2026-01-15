@@ -19,6 +19,12 @@ import { fetchManagerAtRisk, fetchManagerCompliance } from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import TrainingSessionBuilder from "../components/TrainingSessionBuilder";
 
+const requiredLevelLabels: Record<number, string> = {
+  1: "Essential",
+  2: "Nice to have",
+  3: "Home compliance",
+};
+
 function ManagerPage() {
   const { role, userEmail } = useUserContext();
 
@@ -87,7 +93,7 @@ function ManagerPage() {
                   secondary={entry.requirements
                     .map(
                       (req: any) =>
-                        `${req.requirement.name} (${req.status})${req.expiry ? ` - expires ${new Date(
+                        `${req.requirement.name} (${requiredLevelLabels[req.requirement.requiredLevel] ?? req.requirement.requiredLevel ?? "-"}) (${req.status})${req.expiry ? ` - expires ${new Date(
                           req.expiry,
                         ).toLocaleDateString()}` : ""}`,
                     )

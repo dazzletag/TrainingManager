@@ -46,9 +46,9 @@ def parse_date(value: Any) -> Optional[dt.datetime]:
     if value is None or value == "":
         return None
     if isinstance(value, dt.datetime):
-        return value
+        return value.astimezone(dt.UTC) if value.tzinfo else value.replace(tzinfo=dt.UTC)
     if isinstance(value, dt.date):
-        return dt.datetime.combine(value, dt.time.min)
+        return dt.datetime.combine(value, dt.time.min).replace(tzinfo=dt.UTC)
     if isinstance(value, (int, float)):
         return None
     if isinstance(value, str):
@@ -58,11 +58,12 @@ def parse_date(value: Any) -> Optional[dt.datetime]:
         if text.endswith("Z"):
             text = text.replace("Z", "+00:00")
         try:
-            return dt.datetime.fromisoformat(text)
+            parsed = dt.datetime.fromisoformat(text)
+            return parsed.astimezone(dt.UTC) if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
         except ValueError:
             for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
                 try:
-                    return dt.datetime.strptime(text, fmt)
+                    return dt.datetime.strptime(text, fmt).replace(tzinfo=dt.UTC)
                 except ValueError:
                     continue
     return None
@@ -330,11 +331,14 @@ def fetch_lookup_maps(cursor: pyodbc.Cursor) -> Tuple[Dict[str, Any], Dict[str, 
         roles_by_name[row.name] = {"id": row.id, "externalId": row.externalId}
 
     requirements_by_name: Dict[str, Dict[str, Any]] = {}
-    cursor.execute("SELECT id, name, validityPeriodMonths FROM training_requirement")
+    cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
     for row in cursor.fetchall():
         requirements_by_name[row.name] = {
             "id": row.id,
             "validityPeriodMonths": row.validityPeriodMonths,
+            "mandatory": bool(row.mandatory),
+            "requiredLevel": row.requiredLevel,
+            "category": row.category,
         }
 
     persons_by_external: Dict[str, Dict[str, Any]] = {}
@@ -412,25 +416,63 @@ def ensure_requirement(
     validity_months: int,
     mandatory: bool,
     category: Optional[str],
+    required_level: int,
 ) -> str:
-    if name in requirements_by_name:
-        return str(requirements_by_name[name]["id"])
+    existing = requirements_by_name.get(name)
+    if existing:
+        updates = []
+        params: List[Any] = []
+        if existing.get("validityPeriodMonths") != validity_months:
+            updates.append("validityPeriodMonths = ?")
+            params.append(validity_months)
+        if existing.get("mandatory") != mandatory:
+            updates.append("mandatory = ?")
+            params.append(1 if mandatory else 0)
+        if existing.get("requiredLevel") != required_level:
+            updates.append("requiredLevel = ?")
+            params.append(required_level)
+        if existing.get("category") != category:
+            updates.append("category = ?")
+            params.append(category)
+        if updates:
+            params.append(existing["id"])
+            cursor.execute(
+                f"UPDATE training_requirement SET {', '.join(updates)}, updatedAt = GETUTCDATE() WHERE id = ?",
+                *params,
+            )
+            existing.update(
+                {
+                    "validityPeriodMonths": validity_months,
+                    "mandatory": mandatory,
+                    "requiredLevel": required_level,
+                    "category": category,
+                }
+            )
+        return str(existing["id"])
 
     description = f"Imported from Planday training matrix ({name})"
     if category:
         description = f"{description}. Category: {category}"
 
     cursor.execute(
-        "INSERT INTO training_requirement (id, name, description, validityPeriodMonths, mandatory, createdAt, updatedAt) "
-        "VALUES (NEWID(), ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
+        "INSERT INTO training_requirement (id, name, description, validityPeriodMonths, mandatory, requiredLevel, category, createdAt, updatedAt) "
+        "VALUES (NEWID(), ?, ?, ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
         name,
         description,
         validity_months,
         1 if mandatory else 0,
+        required_level,
+        category,
     )
     cursor.execute("SELECT id FROM training_requirement WHERE name = ?", name)
     requirement_id = str(cursor.fetchone().id)
-    requirements_by_name[name] = {"id": requirement_id, "validityPeriodMonths": validity_months}
+    requirements_by_name[name] = {
+        "id": requirement_id,
+        "validityPeriodMonths": validity_months,
+        "mandatory": mandatory,
+        "requiredLevel": required_level,
+        "category": category,
+    }
 
     return requirement_id
 
@@ -622,11 +664,14 @@ def main() -> int:
         cursor
     )
     requirements_by_name: Dict[str, Dict[str, Any]] = {}
-    cursor.execute("SELECT id, name, validityPeriodMonths FROM training_requirement")
+    cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
     for row in cursor.fetchall():
         requirements_by_name[row.name] = {
             "id": row.id,
             "validityPeriodMonths": row.validityPeriodMonths,
+            "mandatory": bool(row.mandatory),
+            "requiredLevel": row.requiredLevel,
+            "category": row.category,
         }
 
     evidence_by_key: Dict[Tuple[str, str], str] = {}
@@ -715,6 +760,7 @@ def main() -> int:
                 validity_months = validity_overrides.get(course_name, max(period_years * 12, DEFAULT_VALIDITY_MONTHS))
                 category = "one-off" if is_one_off else None
                 needed = course.get("needed", 1)
+                required_level = needed
                 mandatory = needed in (1, 3)
 
                 requirement_id = ensure_requirement(
@@ -724,6 +770,7 @@ def main() -> int:
                     validity_months,
                     mandatory,
                     category,
+                    required_level,
                 )
                 ensure_role_requirement_link(cursor, requirement_role_links, requirement_id, role_id)
                 assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)

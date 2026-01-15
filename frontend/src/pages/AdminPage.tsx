@@ -24,18 +24,27 @@ import {
   CircularProgress,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import { fetchTrainingRequirements, createTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence } from "../services/api";
+import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence } from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import { useState } from "react";
+
+const requiredLevelLabels: Record<number, string> = {
+  1: "Essential",
+  2: "Nice to have",
+  3: "Home compliance",
+};
 
 function AdminPage() {
   const { role, userEmail } = useUserContext();
   const [tabIndex, setTabIndex] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
     name: "",
     description: "",
     validityPeriodMonths: 12,
     mandatory: true,
+    requiredLevel: 1,
+    category: "",
     roleExternalIds: [] as string[],
   });
 
@@ -61,6 +70,11 @@ function AdminPage() {
 
   const createMutation = useMutation({
     mutationFn: (payload: any) => createTrainingRequirement(payload, role, userEmail),
+    onSuccess: () => trainingRequirementsQuery.refetch(),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { id: string; body: any }) => updateTrainingRequirement(payload.id, payload.body, role, userEmail),
     onSuccess: () => trainingRequirementsQuery.refetch(),
   });
 
@@ -95,8 +109,11 @@ function AdminPage() {
                 <TableRow>
                   <TableCell>Name</TableCell>
                   <TableCell>Validity (months)</TableCell>
+                  <TableCell>Level</TableCell>
+                  <TableCell>Category</TableCell>
                   <TableCell>Mandatory</TableCell>
                   <TableCell>Roles</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -104,8 +121,31 @@ function AdminPage() {
                   <TableRow key={requirement.id}>
                     <TableCell>{requirement.name}</TableCell>
                     <TableCell>{requirement.validityPeriodMonths}</TableCell>
+                    <TableCell>
+                      {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
+                    </TableCell>
+                    <TableCell>{requirement.category ?? "-"}</TableCell>
                     <TableCell>{requirement.mandatory ? "Yes" : "No"}</TableCell>
                     <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setEditingId(requirement.id);
+                          setFormValues({
+                            name: requirement.name ?? "",
+                            description: requirement.description ?? "",
+                            validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
+                            mandatory: requirement.mandatory ?? true,
+                            requiredLevel: requirement.requiredLevel ?? 1,
+                            category: requirement.category ?? "",
+                            roleExternalIds: requirement.roles.map((role: any) => role.externalId),
+                          });
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -140,6 +180,23 @@ function AdminPage() {
                 onChange={(event) =>
                   setFormValues((prev) => ({ ...prev, validityPeriodMonths: Number(event.target.value) }))
                 }
+              />
+              <TextField
+                label="Required Level (1 essential, 2 nice to have, 3 home compliance)"
+                fullWidth
+                size="small"
+                type="number"
+                value={formValues.requiredLevel}
+                onChange={(event) =>
+                  setFormValues((prev) => ({ ...prev, requiredLevel: Number(event.target.value) }))
+                }
+              />
+              <TextField
+                label="Category (e.g. one-off)"
+                fullWidth
+                size="small"
+                value={formValues.category}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
               />
               <TextField
                 label="Description"
@@ -177,24 +234,51 @@ function AdminPage() {
                   ))}
                 </Select>
               </FormControl>
-              <Box sx={{ gridColumn: "1 / -1" }}>
+              <Box sx={{ gridColumn: "1 / -1", display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                 <Button
                   variant="contained"
-                  disabled={createMutation.status === "pending"}
+                  disabled={createMutation.status === "pending" || updateMutation.status === "pending"}
                   onClick={() => {
-                    createMutation.mutate({
+                    const payload = {
                       name: formValues.name,
                       description: formValues.description,
                       validityPeriodMonths: formValues.validityPeriodMonths,
                       mandatory: formValues.mandatory,
+                      requiredLevel: formValues.requiredLevel,
+                      category: formValues.category,
                       roleExternalIds: formValues.roleExternalIds,
-                    });
+                    };
+                    if (editingId) {
+                      updateMutation.mutate({ id: editingId, body: payload });
+                    } else {
+                      createMutation.mutate(payload);
+                    }
                   }}
                 >
-                  Save requirement
+                  {editingId ? "Update requirement" : "Save requirement"}
                 </Button>
+                {editingId && (
+                  <Button
+                    variant="text"
+                    onClick={() => {
+                      setEditingId(null);
+                      setFormValues({
+                        name: "",
+                        description: "",
+                        validityPeriodMonths: 12,
+                        mandatory: true,
+                        requiredLevel: 1,
+                        category: "",
+                        roleExternalIds: [],
+                      });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
                 {createMutation.isError && <Alert severity="error">Unable to persist requirement</Alert>}
                 {createMutation.isSuccess && <Alert severity="success">Requirement saved</Alert>}
+                {updateMutation.isSuccess && <Alert severity="success">Requirement updated</Alert>}
               </Box>
             </Box>
           </Box>

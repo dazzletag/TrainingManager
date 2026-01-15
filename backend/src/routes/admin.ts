@@ -21,7 +21,7 @@ router.get("/training-requirements", async (req, res) => {
 });
 
 router.post("/training-requirements", async (req, res) => {
-  const { name, description, validityPeriodMonths, mandatory, roleExternalIds } = req.body;
+  const { name, description, validityPeriodMonths, mandatory, roleExternalIds, requiredLevel, category } = req.body;
 
   if (!name || !description || !validityPeriodMonths) {
     return res.status(400).json({ message: "Name, description, and validity period are required" });
@@ -39,6 +39,8 @@ router.post("/training-requirements", async (req, res) => {
     description,
     validityPeriodMonths,
     mandatory: mandatory ?? true,
+    requiredLevel: requiredLevel ?? (mandatory === false ? 2 : 1),
+    category,
     roles,
   });
 
@@ -51,6 +53,43 @@ router.post("/training-requirements", async (req, res) => {
   });
 
   res.status(201).json({ requirement });
+});
+
+router.put("/training-requirements/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, description, validityPeriodMonths, mandatory, roleExternalIds, requiredLevel, category } = req.body;
+
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const roleRepo = AppDataSource.getRepository(Role);
+
+  const requirement = await requirementRepo.findOne({ where: { id }, relations: ["roles"] });
+  if (!requirement) {
+    return res.status(404).json({ message: "Requirement not found" });
+  }
+
+  if (name !== undefined) requirement.name = name;
+  if (description !== undefined) requirement.description = description;
+  if (validityPeriodMonths !== undefined) requirement.validityPeriodMonths = Number(validityPeriodMonths);
+  if (mandatory !== undefined) requirement.mandatory = Boolean(mandatory);
+  if (requiredLevel !== undefined) requirement.requiredLevel = Number(requiredLevel);
+  if (category !== undefined) requirement.category = category || null;
+
+  if (Array.isArray(roleExternalIds)) {
+    const roles = roleExternalIds.length
+      ? await roleRepo.find({ where: { externalId: In(roleExternalIds) } })
+      : [];
+    requirement.roles = roles;
+  }
+
+  await requirementRepo.save(requirement);
+
+  await logAudit({
+    who: req.user?.email ?? "system",
+    what: "training-requirement-updated",
+    why: `Updated ${requirement.name}`,
+  });
+
+  res.json({ requirement });
 });
 
 router.get("/audit", async (req, res) => {

@@ -32,6 +32,12 @@ const statusColors: Record<string, "success" | "warning" | "error"> = {
   missing: "error",
 };
 
+const requiredLevelLabels: Record<number, string> = {
+  1: "Essential",
+  2: "Nice to have",
+  3: "Home compliance",
+};
+
 function StatusChip({ status }: { status: string }) {
   return <Chip label={status} color={statusColors[status] ?? "default"} size="small" />;
 }
@@ -105,6 +111,8 @@ function StaffPage() {
                 <TableRow>
                   <TableCell>Requirement</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Level</TableCell>
+                  <TableCell>Category</TableCell>
                   <TableCell>Expiry</TableCell>
                   <TableCell>Evidence Count</TableCell>
                 </TableRow>
@@ -116,6 +124,10 @@ function StaffPage() {
                     <TableCell>
                       <StatusChip status={item.status} />
                     </TableCell>
+                    <TableCell>
+                      {requiredLevelLabels[item.requirement.requiredLevel] ?? item.requirement.requiredLevel ?? "-"}
+                    </TableCell>
+                    <TableCell>{item.requirement.category ?? "-"}</TableCell>
                     <TableCell>{formatDate(item.expiry)}</TableCell>
                     <TableCell>{item.evidence.length}</TableCell>
                   </TableRow>
