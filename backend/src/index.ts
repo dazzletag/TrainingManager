@@ -17,14 +17,13 @@ const port = Number(process.env.PORT ?? 4000);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
 if (azureAuthEnabled) {
   app.use(azureAuthMiddleware);
   app.use(azureUserMapper);
 } else {
   app.use(mockAuthMiddleware);
 }
-
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/v1", routes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
