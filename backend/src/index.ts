@@ -21,12 +21,16 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 if (azureAuthEnabled) {
   app.use(azureAuthMiddleware);
   app.use(azureUserMapper);
+  app.use(mockAuthMiddleware);
 } else {
   app.use(mockAuthMiddleware);
 }
 app.use("/api/v1", routes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if ((err as { name?: string }).name === "UnauthorizedError") {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
   console.error(err);
   res.status(500).json({ message: "Internal server error" });
 });

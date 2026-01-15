@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToMany,
+  JoinTable,
   CreateDateColumn,
   UpdateDateColumn,
 } from "typeorm";
@@ -33,6 +34,11 @@ export class TrainingRequirement {
 
   @ManyToMany(() => Role, (role) => role.trainingRequirements, {
     cascade: ["insert"],
+  })
+  @JoinTable({
+    name: "training_requirement_roles_role",
+    joinColumn: { name: "trainingRequirementId", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "roleId", referencedColumnName: "id" },
   })
   roles!: Role[];
 

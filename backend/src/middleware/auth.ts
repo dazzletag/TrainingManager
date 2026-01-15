@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 
 export function mockAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (req.user) {
+    return next();
+  }
   const roleHeader = req.header("x-user-role");
   req.user = {
     id: req.header("x-user-id") ?? "system",

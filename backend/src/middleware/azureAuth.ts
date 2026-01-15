@@ -25,6 +25,7 @@ export const azureAuthMiddleware: RequestHandler = azureAuthEnabled
       audience: clientId,
       issuer: azureIssuer,
       requestProperty: "auth",
+      credentialsRequired: false,
     })
   : ((req, _res, next) => {
       next();
