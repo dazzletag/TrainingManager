@@ -5,15 +5,13 @@ import { Person } from "../entities/Person";
 import { SessionAssignment } from "../entities/SessionAssignment";
 import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
+import { Assignment } from "../entities/Assignment";
+import { Evidence } from "../entities/Evidence";
 import { evaluateRequirement } from "../services/complianceService";
 import { assignToTrainingShift } from "../services/plandayScheduling";
 import { In } from "typeorm";
 
 const router = Router();
-
-function listRequirements(person: Person) {
-  return (person.assignments ?? []).map((assignment) => assignment.requirement);
-}
 
 function resolveRequirementMeta(
   requirement: TrainingRequirement,
@@ -28,72 +26,45 @@ function resolveRequirementMeta(
   });
 }
 
-async function buildRequirementMetaByGroup(groupIds: string[]) {
-  if (!groupIds.length) {
-    return new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
-  }
-  const repo = AppDataSource.getRepository(TrainingRequirementGroup);
-  const links = await repo.find({
-    where: { roleId: In(groupIds) },
-  });
-  const byGroup = new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
-  for (const link of links) {
-    if (!byGroup.has(link.roleId)) {
-      byGroup.set(link.roleId, new Map());
-    }
-    byGroup.get(link.roleId)!.set(link.requirementId, {
-      requiredLevel: link.requiredLevel,
-      mandatory: link.mandatory,
-    });
-  }
-  return byGroup;
-}
-
-function mergeGroupRequirementMeta(
+function mergeRequirementMetaForPerson(
   groupIds: string[],
-  byGroup: Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>,
+  metaByRoleId: Map<string, { requiredLevel: number; mandatory: boolean }>,
 ) {
-  const metaMap = new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  let merged: { requiredLevel: number; mandatory: boolean } | undefined;
   for (const groupId of groupIds) {
-    const groupMap = byGroup.get(groupId);
-    if (!groupMap) continue;
-    for (const [requirementId, meta] of groupMap.entries()) {
-      const existing = metaMap.get(requirementId);
-      if (!existing) {
-        metaMap.set(requirementId, { ...meta });
-        continue;
-      }
-      metaMap.set(requirementId, {
-        requiredLevel: Math.min(existing.requiredLevel, meta.requiredLevel),
-        mandatory: existing.mandatory || meta.mandatory,
-      });
+    const meta = metaByRoleId.get(groupId);
+    if (!meta) continue;
+    if (!merged) {
+      merged = { ...meta };
+      continue;
     }
+    merged = {
+      requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
+      mandatory: merged.mandatory || meta.mandatory,
+    };
   }
-  return metaMap;
+  return merged;
 }
 
 function summarizeCompliance(
   person: Person,
-  requirementMetaByGroup: Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>,
+  requirement: TrainingRequirement,
+  assignment: Assignment | undefined,
+  metaByRoleId: Map<string, { requiredLevel: number; mandatory: boolean }>,
 ) {
-  const requirementMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
   const groupIds = person.groups?.map((group) => group.id) ?? [];
-  const requirementMeta = mergeGroupRequirementMeta(groupIds, requirementMetaByGroup);
-  const requirements = listRequirements(person).map((requirement) =>
-    evaluateRequirement(
-      resolveRequirementMeta(requirement, requirementMeta.get(requirement.id)),
-      requirementMap.get(requirement.id),
-    ),
+  const requirementMeta = mergeRequirementMetaForPerson(groupIds, metaByRoleId);
+  const result = evaluateRequirement(
+    resolveRequirementMeta(requirement, requirementMeta),
+    assignment,
   );
-  const hasIssue = requirements.some((requirement) => requirement.status !== "compliant");
   return {
-    status: hasIssue ? (requirements.some((result) => result.status === "missing") ? "missing" : "at-risk") : "compliant",
-    requirements,
+    status: result.status,
+    requirements: [result],
   };
 }
 
-function getTrainingDates(person: Person) {
-  const evidenceEntries = person.assignments?.flatMap((assignment) => assignment.evidence ?? []) ?? [];
+function getTrainingDates(evidenceEntries: Evidence[]) {
   const expiryTimestamps = evidenceEntries
     .map((entry) => entry.validTo?.getTime())
     .filter((value): value is number => typeof value === "number");
@@ -112,14 +83,21 @@ function getTrainingDates(person: Person) {
 router.get("/overview", async (_req, res) => {
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const requirementGroupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
+  const assignmentRepo = AppDataSource.getRepository(Assignment);
+
+  const mandatoryRequirement = await requirementRepo.findOne({
+    where: { name: "Mandatory Training" },
+  });
+  if (!mandatoryRequirement) {
+    return res.json({ overview: [], unassigned: [] });
+  }
 
   const sessions = await sessionRepo.find({
     relations: {
       assignments: {
         person: {
-          role: {
-            trainingRequirements: true,
-          },
           groups: true,
           assignments: {
             evidence: true,
@@ -129,23 +107,31 @@ router.get("/overview", async (_req, res) => {
     },
   });
 
-  const personList = await personRepo.find({
-    relations: {
-      role: true,
-      groups: true,
-      assignments: {
-        evidence: true,
-      },
-    },
+  const mandatoryAssignments = await assignmentRepo.find({
+    where: { requirement: { id: mandatoryRequirement.id } },
+    relations: { evidence: true },
   });
-  const allPeople = [
-    ...personList,
-    ...sessions.flatMap((session) => session.assignments.map((assignment) => assignment.person)),
-  ];
+  const personIds = Array.from(new Set(mandatoryAssignments.map((assignment) => assignment.person.id)));
+  const personList = personIds.length
+    ? await personRepo.find({
+        where: { id: In(personIds) },
+        relations: { role: true, groups: true },
+      })
+    : [];
+  const personMap = new Map(personList.map((person) => [person.id, person]));
+  const assignmentMap = new Map(mandatoryAssignments.map((assignment) => [assignment.person.id, assignment]));
+
   const groupIds = Array.from(
-    new Set(allPeople.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
+    new Set(personList.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
   );
-  const requirementMetaByGroup = await buildRequirementMetaByGroup(groupIds);
+  const groupLinks = groupIds.length
+    ? await requirementGroupRepo.find({
+        where: { requirementId: mandatoryRequirement.id, roleId: In(groupIds) },
+      })
+    : [];
+  const metaByRoleId = new Map(
+    groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+  );
 
   const assignedPersonIds = new Set(
     sessions.flatMap((session) => session.assignments.map((assignment) => assignment.person.id)),
@@ -154,35 +140,51 @@ router.get("/overview", async (_req, res) => {
   const overview = sessions.map((session) => {
     const day1Assignments = session.assignments
       .filter((assignment) => assignment.day === 1)
-      .map((assignment) => ({
-        id: assignment.id,
-        dropZoneId: assignment.dropZoneId,
-        person: {
-          id: assignment.person.id,
-          externalId: assignment.person.externalId,
-          name: assignment.person.fullName,
-          email: assignment.person.email,
-          role: assignment.person.role.name,
-          home: assignment.person.homeLocation,
-          status: summarizeCompliance(assignment.person, requirementMetaByGroup).status,
-        },
-      }));
+      .map((assignment) => {
+        const person = personMap.get(assignment.person.id) ?? assignment.person;
+        return {
+          id: assignment.id,
+          dropZoneId: assignment.dropZoneId,
+          person: {
+            id: person.id,
+            externalId: person.externalId,
+            name: person.fullName,
+            email: person.email,
+            role: person.role.name,
+            home: person.homeLocation,
+            status: summarizeCompliance(
+              person,
+              mandatoryRequirement,
+              assignmentMap.get(person.id),
+              metaByRoleId,
+            ).status,
+          },
+        };
+      });
 
     const day2Assignments = session.assignments
       .filter((assignment) => assignment.day === 2)
-      .map((assignment) => ({
-        id: assignment.id,
-        dropZoneId: assignment.dropZoneId,
-        person: {
-          id: assignment.person.id,
-          externalId: assignment.person.externalId,
-          name: assignment.person.fullName,
-          email: assignment.person.email,
-          role: assignment.person.role.name,
-          home: assignment.person.homeLocation,
-          status: summarizeCompliance(assignment.person, requirementMetaByGroup).status,
-        },
-      }));
+      .map((assignment) => {
+        const person = personMap.get(assignment.person.id) ?? assignment.person;
+        return {
+          id: assignment.id,
+          dropZoneId: assignment.dropZoneId,
+          person: {
+            id: person.id,
+            externalId: person.externalId,
+            name: person.fullName,
+            email: person.email,
+            role: person.role.name,
+            home: person.homeLocation,
+            status: summarizeCompliance(
+              person,
+              mandatoryRequirement,
+              assignmentMap.get(person.id),
+              metaByRoleId,
+            ).status,
+          },
+        };
+      });
 
     return {
       id: session.id,
@@ -198,8 +200,14 @@ router.get("/overview", async (_req, res) => {
   const unassigned = personList
     .filter((person) => !assignedPersonIds.has(person.id))
     .map((person) => {
-      const compliance = summarizeCompliance(person, requirementMetaByGroup);
-      const trainingDates = getTrainingDates(person);
+      const compliance = summarizeCompliance(
+        person,
+        mandatoryRequirement,
+        assignmentMap.get(person.id),
+        metaByRoleId,
+      );
+      const evidenceEntries = assignmentMap.get(person.id)?.evidence ?? [];
+      const trainingDates = getTrainingDates(evidenceEntries);
       return {
         id: person.id,
         externalId: person.externalId,
@@ -211,7 +219,8 @@ router.get("/overview", async (_req, res) => {
         nextDue: trainingDates.nextDue,
         lastTrainingAt: trainingDates.lastTrainingAt,
       };
-    });
+    })
+    .filter((person) => person.status !== "compliant");
 
   const sortedUnassigned = unassigned.slice().sort((a, b) => {
     if (!a.nextDue && !b.nextDue) return 0;
@@ -263,9 +272,8 @@ router.post("/assign", async (req, res) => {
   const person = await personRepo.findOneOrFail({
     where: { id: personId },
     relations: {
-      role: {
-        trainingRequirements: true,
-      },
+      role: true,
+      groups: true,
       assignments: {
         evidence: true,
       },
