@@ -30,6 +30,7 @@ interface PublishResult {
       status: number;
       data: unknown;
     };
+    details?: Record<string, unknown>;
   };
 }
 
@@ -155,15 +156,17 @@ async function unassignExistingShifts(
     return { ok: false };
   }
   const windowDate = window.start.toISOString().split("T")[0];
+  const lookupUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
+  const lookupParams = {
+    employeeId: externalId,
+    date: windowDate,
+    startDateTime: iso(window.start),
+    endDateTime: iso(window.end),
+  };
   try {
     const response = await withRetry(() =>
       plandaySchedulingClient.get<{ data: PlandayShift[] }>("/shifts", {
-        params: {
-          employeeId: externalId,
-          date: windowDate,
-          startDateTime: iso(window.start),
-          endDateTime: iso(window.end),
-        },
+        params: lookupParams,
         headers,
       }),
     );
@@ -204,15 +207,39 @@ async function unassignExistingShifts(
                   data: error.response.data,
                 }
               : undefined,
+            details: {
+              lookup: {
+                method: "GET",
+                url: lookupUrl,
+                payload: lookupParams,
+              },
+              shiftId: shift.id,
+            },
           },
         };
       }
       console.info("Planday shift update succeeded", { shiftId: shift.id });
     }
     return { ok: true };
-  } catch (error) {
+  } catch (error: any) {
     console.warn("Unable to unassign existing shifts for", externalId, error);
-    return { ok: false };
+    return {
+      ok: false,
+      debug: {
+        step: "unassign",
+        request: {
+          method: "GET",
+          url: lookupUrl,
+          payload: lookupParams,
+        },
+        response: error?.response
+          ? {
+              status: error.response.status,
+              data: error.response.data,
+            }
+          : undefined,
+      },
+    };
   }
 }
 
