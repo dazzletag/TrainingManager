@@ -91,6 +91,19 @@ function iso(dt: Date): string {
   return dt.toISOString();
 }
 
+function formatDateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimeLocal(date: Date): string {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 500): Promise<T> {
   try {
     return await fn();
@@ -150,7 +163,7 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
 async function unassignExistingShifts(
   externalId: string,
   window: ShiftWindow,
-): Promise<{ ok: boolean; debug?: PublishResult["debug"] }> {
+): Promise<{ ok: boolean; employeeGroupId?: string; debug?: PublishResult["debug"] }> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
     return { ok: false };
@@ -174,6 +187,7 @@ async function unassignExistingShifts(
     if (!shifts.length) {
       return { ok: true };
     }
+    const employeeGroupId = shifts[0]?.employeeGroupId;
     for (const shift of shifts) {
       const payload = stripUndefined({
         allowConflicts: false,
@@ -219,7 +233,7 @@ async function unassignExistingShifts(
       }
       console.info("Planday shift update succeeded", { shiftId: shift.id });
     }
-    return { ok: true };
+    return { ok: true, employeeGroupId };
   } catch (error: any) {
     console.warn("Unable to unassign existing shifts for", externalId, error);
     return {
@@ -248,6 +262,7 @@ async function createTrainingShift(
   sessionName: string,
   sessionId: string,
   day: number,
+  employeeGroupId?: string,
 ): Promise<void> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
@@ -258,21 +273,19 @@ async function createTrainingShift(
     throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
-  const payload = {
-    employeeId: externalId,
-    positionId: trainingPositionId,
-    departmentId: trainingDepartmentId,
-    startDateTime: iso(window.start),
-    endDateTime: iso(window.end),
-    comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
-    shiftTypeId: trainingShiftTypeId,
-    shiftType: "training",
+  const payload = stripUndefined({
     allowConflicts: false,
-    metadata: {
-      sessionId,
-      day,
-    },
-  };
+    date: formatDateLocal(window.start),
+    comment: "mandatory training",
+    shiftTypeId: trainingShiftTypeId,
+    departmentId: trainingDepartmentId,
+    startTime: formatTimeLocal(window.start),
+    endTime: formatTimeLocal(window.end),
+    useBreaks: true,
+    employeeGroupId,
+    positionId: trainingPositionId,
+    employeeId: externalId,
+  });
   await withRetry(() =>
     plandaySchedulingClient.post("/shifts", payload, { headers }),
   );
@@ -321,8 +334,23 @@ export async function assignToTrainingShift(
         debug: unassigned.debug,
       };
     }
+    if (!unassigned.employeeGroupId) {
+      return {
+        personId,
+        day,
+        moved: false,
+        reason: "Employee group id unavailable for training shift",
+      };
+    }
     try {
-      await createTrainingShift(externalId, window, sessionName, sessionId, day);
+      await createTrainingShift(
+        externalId,
+        window,
+        sessionName,
+        sessionId,
+        day,
+        unassigned.employeeGroupId,
+      );
     } catch (error: any) {
       const createUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
       return {
@@ -336,19 +364,17 @@ export async function assignToTrainingShift(
             method: "POST",
             url: createUrl,
             payload: {
-              employeeId: externalId,
-              positionId: trainingPositionId,
-              departmentId: trainingDepartmentId,
-              startDateTime: iso(window.start),
-              endDateTime: iso(window.end),
-              comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
-              shiftTypeId: trainingShiftTypeId,
-              shiftType: "training",
               allowConflicts: false,
-              metadata: {
-                sessionId,
-                day,
-              },
+              date: formatDateLocal(window.start),
+              comment: "mandatory training",
+              shiftTypeId: trainingShiftTypeId,
+              departmentId: trainingDepartmentId,
+              startTime: formatTimeLocal(window.start),
+              endTime: formatTimeLocal(window.end),
+              useBreaks: true,
+              employeeGroupId: unassigned.employeeGroupId,
+              positionId: trainingPositionId,
+              employeeId: externalId,
             },
           },
           response: error?.response
