@@ -51,6 +51,21 @@ function resolveRoleType(paycode?: string) {
   return code && carePaycodes.has(code) ? "care" : "ancillary";
 }
 
+function resolvePrimaryDepartmentId(home?: string): string | undefined {
+  switch ((home ?? "").trim()) {
+    case "Quarry House":
+      return "7653";
+    case "Beech House":
+      return "7655";
+    case "Field House":
+      return "7652";
+    case "Glebe House":
+      return "7654";
+    default:
+      return undefined;
+  }
+}
+
 type RecommendInput = {
   employee_number: string;
   home: string;
@@ -279,6 +294,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
             email: person.email,
             role: person.role.name,
             home: person.homeLocation,
+            primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
             status: summarizeCompliance(
               person,
               mandatoryRequirement,
@@ -309,6 +325,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
             email: person.email,
             role: person.role.name,
             home: person.homeLocation,
+            primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
             status: summarizeCompliance(
               person,
               mandatoryRequirement,
@@ -357,6 +374,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         name: person.fullName,
         status: compliance.status,
         home: person.homeLocation,
+        primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
         role: person.role.name,
         employmentStatus: person.employmentStatus,
         nextDue: trainingDates.nextDue,
