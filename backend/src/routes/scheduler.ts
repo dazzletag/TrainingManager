@@ -58,6 +58,16 @@ type RecommendInput = {
   last_completed_date?: string;
 };
 
+function sortAssignmentsByHome(assignments: Array<{ person: { home?: string; name: string } }>) {
+  return assignments.slice().sort((a, b) => {
+    const homeA = a.person.home ?? "";
+    const homeB = b.person.home ?? "";
+    const homeDelta = homeA.localeCompare(homeB);
+    if (homeDelta !== 0) return homeDelta;
+    return a.person.name.localeCompare(b.person.name);
+  });
+}
+
 async function runRecommendationScript(employees: RecommendInput[]): Promise<RecommendInput[]> {
   const scriptPath = path.join(process.cwd(), "src", "services", "SuggestAttendees.py");
   if (!fs.existsSync(scriptPath)) {
@@ -315,8 +325,12 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
       day1EndTime: session.day1EndTime,
       day2StartTime: session.day2StartTime,
       day2EndTime: session.day2EndTime,
-      day1Assignments: day1Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
-      day2Assignments: day2Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
+      day1Assignments: sortAssignmentsByHome(
+        day1Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
+      ),
+      day2Assignments: sortAssignmentsByHome(
+        day2Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
+      ),
     };
   });
 
