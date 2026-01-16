@@ -19,7 +19,6 @@ import SchoolIcon from "@mui/icons-material/School";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useState } from "react";
-import { RoleSwitcher } from "./RoleSwitcher";
 
 const drawerWidth = 240;
 
@@ -89,7 +88,6 @@ function Layout() {
           <Typography variant="h6" noWrap component="div">
             Mandatory Training Platform
           </Typography>
-          <RoleSwitcher />
         </Toolbar>
       </AppBar>
       <Drawer
