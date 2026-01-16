@@ -8,18 +8,35 @@ const reportingClient = axios.create({
   timeout: 20000,
 });
 
-export function fetchReportingSummary() {
-  return reportingClient.get("/reporting/summary");
+export type ReportingFilters = {
+  home?: string;
+  roles?: string[];
+  importance?: string[];
+  courseKeywords?: string[];
+};
+
+function buildParams(filters?: ReportingFilters) {
+  if (!filters) return undefined;
+  const params: Record<string, string> = {};
+  if (filters.home) params.home = filters.home;
+  if (filters.roles?.length) params.roles = filters.roles.join(",");
+  if (filters.importance?.length) params.importance = filters.importance.join(",");
+  if (filters.courseKeywords?.length) params.courseKeywords = filters.courseKeywords.join(",");
+  return params;
 }
 
-export function fetchReportingCompliance() {
-  return reportingClient.get("/reporting/compliance");
+export function fetchReportingSummary(filters?: ReportingFilters) {
+  return reportingClient.get("/reporting/summary", { params: buildParams(filters) });
 }
 
-export function fetchReportingForecast() {
-  return reportingClient.get("/reporting/forecast");
+export function fetchReportingCompliance(filters?: ReportingFilters) {
+  return reportingClient.get("/reporting/compliance", { params: buildParams(filters) });
 }
 
-export function fetchReportingUtilisation() {
-  return reportingClient.get("/reporting/utilisation");
+export function fetchReportingForecast(filters?: ReportingFilters) {
+  return reportingClient.get("/reporting/forecast", { params: buildParams(filters) });
+}
+
+export function fetchReportingUtilisation(filters?: ReportingFilters) {
+  return reportingClient.get("/reporting/utilisation", { params: buildParams(filters) });
 }

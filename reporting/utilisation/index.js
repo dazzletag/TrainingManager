@@ -32,7 +32,7 @@ module.exports = async function (context) {
     context.log.error("Reporting utilisation failed", error);
     context.res = {
       status: 500,
-      body: { message: "Unable to load utilisation data" },
+      body: { message: "Unable to load utilisation data", error: error?.message ?? String(error) },
     };
   }
 };

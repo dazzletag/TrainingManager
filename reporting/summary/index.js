@@ -1,7 +1,16 @@
 const { query } = require("../shared/db");
+const { buildReportingWhereClause, getReportingFilters } = require("../shared/reportingFilters");
 
-module.exports = async function (context) {
+module.exports = async function (context, req) {
   try {
+    const filters = getReportingFilters(req ?? context.req);
+    const { clause, params } = buildReportingWhereClause(filters, {
+      home: true,
+      roles: true,
+      importance: true,
+      courseKeywords: true,
+    });
+
     const [overall] = await query(
       `
       SELECT
@@ -13,8 +22,10 @@ module.exports = async function (context) {
         SUM(CASE WHEN complianceStatus = 'due_90' THEN 1 ELSE 0 END) AS due90Count,
         AVG(CASE WHEN complianceStatus = 'overdue' THEN CAST(daysOverdue AS float) END) AS avgDaysLate
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE mandatory = 1${clause}
+      OPTION (RECOMPILE)
       `,
+      params,
     );
 
     const homes = await query(
@@ -25,10 +36,17 @@ module.exports = async function (context) {
         SUM(CASE WHEN complianceStatus = 'compliant' THEN 1 ELSE 0 END) AS compliant,
         SUM(CASE WHEN complianceStatus IN ('overdue', 'due_30') THEN 1 ELSE 0 END) AS atRisk
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE mandatory = 1${clause}
       GROUP BY homeLocation
+      OPTION (RECOMPILE)
       `,
+      params,
     );
+
+    const { clause: forecastClause, params: forecastParams } = buildReportingWhereClause(filters, {
+      home: true,
+      courseKeywords: true,
+    });
 
     const forecast = await query(
       `
@@ -38,10 +56,12 @@ module.exports = async function (context) {
         SUM(overdueCount) AS overdueCount
       FROM vw_training_due_forecast
       WHERE dueMonth >= DATEFROMPARTS(YEAR(GETUTCDATE()), MONTH(GETUTCDATE()), 1)
-        AND dueMonth < DATEADD(month, 4, DATEFROMPARTS(YEAR(GETUTCDATE()), MONTH(GETUTCDATE()), 1))
+        AND dueMonth < DATEADD(month, 4, DATEFROMPARTS(YEAR(GETUTCDATE()), MONTH(GETUTCDATE()), 1))${forecastClause}
       GROUP BY dueMonth
       ORDER BY dueMonth
+      OPTION (RECOMPILE)
       `,
+      forecastParams,
     );
 
     const velocity = await query(
@@ -60,14 +80,17 @@ module.exports = async function (context) {
       `
       SELECT TOP 6
         requirementName,
+        requiredLevel,
         COUNT(*) AS total,
         SUM(CASE WHEN complianceStatus = 'overdue' THEN 1 ELSE 0 END) AS overdueCount,
         AVG(CASE WHEN complianceStatus = 'overdue' THEN CAST(daysOverdue AS float) END) AS avgDaysLate
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
-      GROUP BY requirementName
+      WHERE mandatory = 1${clause}
+      GROUP BY requirementName, requiredLevel
       ORDER BY overdueCount DESC, avgDaysLate DESC
+      OPTION (RECOMPILE)
       `,
+      params,
     );
 
     const distributionByHome = await query(
@@ -76,10 +99,12 @@ module.exports = async function (context) {
         homeLocation AS home,
         COUNT(DISTINCT personId) AS totalPeople
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE mandatory = 1${clause}
       GROUP BY homeLocation
       ORDER BY homeLocation
+      OPTION (RECOMPILE)
       `,
+      params,
     );
 
     const distributionByRole = await query(
@@ -88,10 +113,12 @@ module.exports = async function (context) {
         roleCategory AS roleType,
         COUNT(DISTINCT personId) AS totalPeople
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE mandatory = 1${clause}
       GROUP BY roleCategory
       ORDER BY roleCategory
+      OPTION (RECOMPILE)
       `,
+      params,
     );
 
     const repeatAttendance = await query(
@@ -163,7 +190,7 @@ module.exports = async function (context) {
     context.log.error("Reporting summary failed", error);
     context.res = {
       status: 500,
-      body: { message: "Unable to load reporting summary" },
+      body: { message: "Unable to load reporting summary", error: error?.message ?? String(error) },
     };
   }
 };
