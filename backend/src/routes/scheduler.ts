@@ -291,28 +291,34 @@ router.post("/assign", async (req, res) => {
     },
   });
 
-  let assignment = await assignmentRepo.findOne({
+  const existingAssignments = await assignmentRepo.find({
     where: {
       session: { id: sessionId },
       person: { id: personId },
-      day,
     },
   });
+  const assignmentsByDay = new Map(existingAssignments.map((assignment) => [assignment.day, assignment]));
+  const assignments: SessionAssignment[] = [];
 
-  if (!assignment) {
-    assignment = assignmentRepo.create({
-      session,
-      person,
-      day,
-      dropZoneId,
-    });
-  } else {
-    assignment.dropZoneId = dropZoneId;
+  for (const targetDay of [1, 2]) {
+    const dayDropZoneId = `${dropZoneId}-day-${targetDay}`;
+    let assignment = assignmentsByDay.get(targetDay);
+    if (!assignment) {
+      assignment = assignmentRepo.create({
+        session,
+        person,
+        day: targetDay,
+        dropZoneId: dayDropZoneId,
+      });
+    } else {
+      assignment.dropZoneId = dayDropZoneId;
+    }
+    assignments.push(assignment);
   }
 
-  await assignmentRepo.save(assignment);
+  await assignmentRepo.save(assignments);
 
-  res.json({ assignment });
+  res.json({ assignments });
 });
 
 router.post("/assign/remove", async (req, res) => {

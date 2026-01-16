@@ -358,25 +358,7 @@ function TrainingSessionBuilder() {
 
     const dropZoneId = `session-${selectedSession.id}-day-${day}-${payload.personId}-${Date.now()}`;
 
-    assignMutation.mutate(
-
-      { sessionId: selectedSession.id, personId: payload.personId, day, dropZoneId },
-
-      {
-
-        onSuccess: () => {
-
-          if (payload.assignmentId && payload.day && payload.day !== day) {
-
-            removeMutation.mutate(payload.assignmentId);
-
-          }
-
-        },
-
-      },
-
-    );
+    assignMutation.mutate({ sessionId: selectedSession.id, personId: payload.personId, day, dropZoneId });
 
   };
 
