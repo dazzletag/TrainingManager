@@ -112,6 +112,8 @@ paths:
                 - name
                 - day1
                 - day2
+                - startTime
+                - endTime
               properties:
                 name:
                   type: string
@@ -121,6 +123,12 @@ paths:
                 day2:
                   type: string
                   format: date
+                startTime:
+                  type: string
+                  example: "09:15"
+                endTime:
+                  type: string
+                  example: "15:45"
                 type:
                   type: string
       responses:

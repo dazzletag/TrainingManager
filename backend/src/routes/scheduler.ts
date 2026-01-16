@@ -203,6 +203,8 @@ router.get("/overview", async (_req, res) => {
       type: session.type,
       day1: toIsoString(session.day1),
       day2: toIsoString(session.day2),
+      startTime: session.startTime,
+      endTime: session.endTime,
       day1Assignments,
       day2Assignments,
     };
@@ -250,10 +252,12 @@ router.get("/overview", async (_req, res) => {
 });
 
 router.post("/sessions", async (req, res) => {
-  const { name, day1, day2, type } = req.body;
+  const { name, day1, day2, type, startTime, endTime } = req.body;
 
-  if (!name || !day1 || !day2) {
-    return res.status(400).json({ message: "Name, Day1 and Day2 are required" });
+  if (!name || !day1 || !day2 || !startTime || !endTime) {
+    return res
+      .status(400)
+      .json({ message: "Name, Day1, Day2, startTime and endTime are required" });
   }
 
   const repo = AppDataSource.getRepository(TrainingSession);
@@ -261,6 +265,8 @@ router.post("/sessions", async (req, res) => {
     name,
     day1: new Date(day1),
     day2: new Date(day2),
+    startTime,
+    endTime,
     type: type ?? "Mandatory Training",
   });
 
@@ -359,6 +365,8 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
           session.id,
           assignment.day,
           assignment.day === 1 ? session.day1 : session.day2,
+          session.startTime,
+          session.endTime,
         ),
       ),
     );

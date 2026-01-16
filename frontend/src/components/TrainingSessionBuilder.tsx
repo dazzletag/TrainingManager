@@ -97,6 +97,10 @@ type SessionOverview = {
 
   day2: string;
 
+  startTime?: string;
+
+  endTime?: string;
+
   day1Assignments: SessionAssignment[];
 
   day2Assignments: SessionAssignment[];
@@ -186,6 +190,10 @@ function TrainingSessionBuilder() {
 
     day2: "",
 
+    startTime: "09:15",
+
+    endTime: "15:45",
+
   });
 
   const [publishFeedback, setPublishFeedback] = useState<PublishFeedback | null>(null);
@@ -246,7 +254,7 @@ function TrainingSessionBuilder() {
 
   const createSessionMutation = useMutation({
 
-    mutationFn: (payload: { name: string; type: string; day1: string; day2: string }) =>
+    mutationFn: (payload: { name: string; type: string; day1: string; day2: string; startTime: string; endTime: string }) =>
 
       createTrainingSession(payload, role, userEmail),
 
@@ -256,7 +264,7 @@ function TrainingSessionBuilder() {
 
       setSelectedSessionId(response.data.session.id);
 
-      setForm({ name: "", type: "Mandatory Training", day1: "", day2: "" });
+      setForm({ name: "", type: "Mandatory Training", day1: "", day2: "", startTime: "09:15", endTime: "15:45" });
 
     },
 
@@ -524,13 +532,49 @@ function TrainingSessionBuilder() {
 
           />
 
+          <TextField
+
+            label="Start time"
+
+            type="time"
+
+            size="small"
+
+            value={form.startTime}
+
+            onChange={(event) => setForm((prev) => ({ ...prev, startTime: event.target.value }))}
+
+            InputLabelProps={{ shrink: true }}
+
+            inputProps={{ step: 300 }}
+
+          />
+
+          <TextField
+
+            label="End time"
+
+            type="time"
+
+            size="small"
+
+            value={form.endTime}
+
+            onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
+
+            InputLabelProps={{ shrink: true }}
+
+            inputProps={{ step: 300 }}
+
+          />
+
           <Button
 
             variant="contained"
 
             onClick={() => createSessionMutation.mutate(form)}
 
-            disabled={!form.name || !form.day1 || !form.day2 || createSessionMutation.isPending}
+            disabled={!form.name || !form.day1 || !form.day2 || !form.startTime || !form.endTime || createSessionMutation.isPending}
 
           >
 

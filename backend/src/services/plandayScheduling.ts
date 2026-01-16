@@ -4,6 +4,8 @@ const trainingPositionId = process.env.PLANDAY_TRAINING_SHIFT_POSITION_ID;
 const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
 const trainingShiftStartHour = Number(process.env.PLANDAY_TRAINING_SHIFT_START_HOUR ?? 9);
 const trainingShiftEndHour = Number(process.env.PLANDAY_TRAINING_SHIFT_END_HOUR ?? 17);
+const trainingDepartmentId = process.env.PLANDAY_TRAINING_SHIFT_DEPARTMENT_ID ?? "7770";
+const trainingShiftTypeId = process.env.PLANDAY_TRAINING_SHIFT_TYPE_ID ?? "71233";
 
 const holidayStatuses = new Set(["approved", "confirmed", "holiday", "paid"]);
 
@@ -32,11 +34,32 @@ interface PlandayAbsence {
   endDateTime: string;
 }
 
-function buildShiftWindow(targetDate: Date): ShiftWindow {
+function parseTime(value?: string) {
+  if (!value) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
+function buildShiftWindow(targetDate: Date, startTime?: string, endTime?: string): ShiftWindow {
   const start = new Date(targetDate);
-  start.setHours(trainingShiftStartHour, 0, 0, 0);
   const end = new Date(targetDate);
-  end.setHours(trainingShiftEndHour, 0, 0, 0);
+  const startParts = parseTime(startTime);
+  const endParts = parseTime(endTime);
+  if (startParts) {
+    start.setHours(startParts.hours, startParts.minutes, 0, 0);
+  } else {
+    start.setHours(trainingShiftStartHour, 0, 0, 0);
+  }
+  if (endParts) {
+    end.setHours(endParts.hours, endParts.minutes, 0, 0);
+  } else {
+    end.setHours(trainingShiftEndHour, 0, 0, 0);
+  }
   return { start, end };
 }
 
@@ -107,10 +130,13 @@ async function createTrainingShift(
   await plandayClient.post("/shifts", {
     employeeId: externalId,
     positionId: trainingPositionId,
+    departmentId: trainingDepartmentId,
     startDateTime: iso(window.start),
     endDateTime: iso(window.end),
     note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+    shiftTypeId: trainingShiftTypeId,
     shiftType: "training",
+    allowConflicts: false,
     metadata: {
       sessionId,
       day,
@@ -125,8 +151,10 @@ export async function assignToTrainingShift(
   sessionId: string,
   day: number,
   date: Date,
+  startTime?: string,
+  endTime?: string,
 ): Promise<PublishResult> {
-  const window = buildShiftWindow(date);
+  const window = buildShiftWindow(date, startTime, endTime);
 
   if (!process.env.PLANDAY_API_TOKEN) {
     return {
