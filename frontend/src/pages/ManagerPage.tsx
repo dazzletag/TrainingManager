@@ -13,19 +13,18 @@ import {
   TableHead,
   TableRow,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
 } from "@mui/material";
-import { fetchManagerAtRisk, fetchManagerCompliance } from "../services/api";
+import { fetchManagerCompliance } from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import TrainingSessionBuilder from "../components/TrainingSessionBuilder";
 
-const requiredLevelLabels: Record<number, string> = {
-  1: "Essential",
-  2: "Nice to have",
-  3: "Home compliance",
+type HomeCompliance = {
+  home: string;
+  total: number;
+  atRisk: number;
+  missing: number;
+  complianceRate: number;
 };
 
 function ManagerPage() {
@@ -36,14 +35,38 @@ function ManagerPage() {
     queryFn: () => fetchManagerCompliance(role, userEmail, "Mandatory Training").then((response) => response.data),
   });
 
-  const atRiskQuery = useQuery({
-    queryKey: ["managerAtRisk", role],
-    queryFn: () => fetchManagerAtRisk(role, userEmail, "Mandatory Training").then((response) => response.data),
-  });
+  const homeCompliance: HomeCompliance[] = (complianceQuery.data?.buckets ?? [])
+    .reduce((acc: HomeCompliance[], bucket: any) => {
+      const home = bucket.homeLocation ?? "Unknown";
+      const existing = acc.find((item) => item.home === home);
+      const totalPeople = Number(bucket.totalPeople ?? 0);
+      const atRiskPeople = Number(bucket.atRiskPeople ?? 0);
+      const missingPeople = Number(bucket.missingPeople ?? 0);
+      if (existing) {
+        existing.total += totalPeople;
+        existing.atRisk += atRiskPeople;
+        existing.missing += missingPeople;
+      } else {
+        acc.push({
+          home,
+          total: totalPeople,
+          atRisk: atRiskPeople,
+          missing: missingPeople,
+          complianceRate: 0,
+        });
+      }
+      return acc;
+    }, [] as HomeCompliance[])
+    .map((item: HomeCompliance) => ({
+      ...item,
+      complianceRate: item.total
+        ? Math.round(((item.total - item.atRisk - item.missing) / item.total) * 100)
+        : 0,
+    }));
 
   return (
     <Stack spacing={3}>
-            <Accordion>
+      <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="h6">Compliance Overview</Typography>
         </AccordionSummary>
@@ -59,22 +82,14 @@ function ManagerPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Home</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>People</TableCell>
                   <TableCell>Compliance Rate</TableCell>
-                  <TableCell>At Risk</TableCell>
-                  <TableCell>Missing</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {complianceQuery.data.buckets.map((bucket: any) => (
-                  <TableRow key={`${bucket.homeLocation}-${bucket.role}`}>
-                    <TableCell>{bucket.homeLocation}</TableCell>
-                    <TableCell>{bucket.role}</TableCell>
-                    <TableCell>{bucket.totalPeople}</TableCell>
+                {homeCompliance.map((bucket) => (
+                  <TableRow key={bucket.home}>
+                    <TableCell>{bucket.home}</TableCell>
                     <TableCell>{bucket.complianceRate}%</TableCell>
-                    <TableCell>{bucket.atRiskPeople}</TableCell>
-                    <TableCell>{bucket.missingPeople}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -83,45 +98,7 @@ function ManagerPage() {
         </AccordionDetails>
       </Accordion>
 
-      <Accordion>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6">At-Risk Staff</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          {atRiskQuery.isLoading && (
-            <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-              <CircularProgress />
-            </Box>
-          )}
-          {atRiskQuery.error && <Alert severity="error">Unable to load at-risk data</Alert>}
-          {atRiskQuery.data && (
-            <List dense>
-              {atRiskQuery.data.atRisk.map((entry: any) => (
-                <ListItem key={entry.person.id} alignItems="flex-start">
-                  <ListItemText
-                    primary={`${entry.person.name} · ${entry.person.role}`}
-                    secondary={entry.requirements
-                      .map(
-                        (req: any) =>
-                          `${req.requirement.name} (${requiredLevelLabels[req.requirement.requiredLevel] ?? req.requirement.requiredLevel ?? "-"}) (${req.status})${req.expiry ? ` - expires ${new Date(
-                            req.expiry,
-                          ).toLocaleDateString()}` : ""}`,
-                      )
-                      .join("; ")}
-                  />
-                </ListItem>
-              ))}
-              {!atRiskQuery.data.atRisk.length && (
-                <ListItem>
-                  <ListItemText primary="No staff currently flagged as at-risk" />
-                </ListItem>
-              )}
-            </List>
-          )}
-        </AccordionDetails>
-      </Accordion>
-
-<TrainingSessionBuilder />
+      <TrainingSessionBuilder />
     </Stack>
   );
 }
