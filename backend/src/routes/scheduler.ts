@@ -383,6 +383,7 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
           assignment.day === 1 ? session.day1 : session.day2,
           assignment.day === 1 ? session.day1StartTime : session.day2StartTime,
           assignment.day === 1 ? session.day1EndTime : session.day2EndTime,
+          assignment.person.homeLocation,
         ),
       );
       await new Promise((resolve) => setTimeout(resolve, 300));

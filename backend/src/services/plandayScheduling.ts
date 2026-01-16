@@ -291,6 +291,25 @@ async function createTrainingShift(
   );
 }
 
+function resolveEmployeeGroupId(
+  employeeGroupId: string | undefined,
+  home?: string,
+): string | undefined {
+  if (employeeGroupId) return employeeGroupId;
+  switch ((home ?? "").trim()) {
+    case "Quarry House":
+      return "21754";
+    case "Beech House":
+      return "21752";
+    case "Field House":
+      return "21755";
+    case "Glebe House":
+      return "21753";
+    default:
+      return "20395";
+  }
+}
+
 export async function assignToTrainingShift(
   personId: string,
   externalId: string,
@@ -300,6 +319,7 @@ export async function assignToTrainingShift(
   date: Date,
   startTime?: string,
   endTime?: string,
+  home?: string,
 ): Promise<PublishResult> {
   const window = buildShiftWindow(date, startTime, endTime);
 
@@ -334,7 +354,11 @@ export async function assignToTrainingShift(
         debug: unassigned.debug,
       };
     }
-    if (!unassigned.employeeGroupId) {
+    const resolvedEmployeeGroupId = resolveEmployeeGroupId(
+      unassigned.employeeGroupId,
+      home,
+    );
+    if (!resolvedEmployeeGroupId) {
       return {
         personId,
         day,
@@ -349,7 +373,7 @@ export async function assignToTrainingShift(
         sessionName,
         sessionId,
         day,
-        unassigned.employeeGroupId,
+        resolvedEmployeeGroupId,
       );
     } catch (error: any) {
       const createUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
@@ -372,7 +396,7 @@ export async function assignToTrainingShift(
               startTime: formatTimeLocal(window.start),
               endTime: formatTimeLocal(window.end),
               useBreaks: true,
-              employeeGroupId: unassigned.employeeGroupId,
+              employeeGroupId: resolvedEmployeeGroupId,
               positionId: trainingPositionId,
               employeeId: externalId,
             },
