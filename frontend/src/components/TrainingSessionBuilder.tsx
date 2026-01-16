@@ -408,7 +408,41 @@ function TrainingSessionBuilder() {
 
   const mandatoryUnassigned = useMemo(
 
-    () => unassigned.filter((person) => person.status !== "compliant"),
+    () => {
+
+      const statusOrder = new Map([
+
+        ["missing", 0],
+
+        ["at-risk", 1],
+
+        ["compliant", 2],
+
+      ]);
+
+      return unassigned
+
+        .filter((person) => person.status !== "compliant")
+
+        .slice()
+
+        .sort((a, b) => {
+
+          const statusDelta = (statusOrder.get(a.status) ?? 99) - (statusOrder.get(b.status) ?? 99);
+
+          if (statusDelta !== 0) return statusDelta;
+
+          if (!a.nextDue && !b.nextDue) return 0;
+
+          if (!a.nextDue) return 1;
+
+          if (!b.nextDue) return -1;
+
+          return new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime();
+
+        });
+
+    },
 
     [unassigned],
 
@@ -744,7 +778,7 @@ function TrainingSessionBuilder() {
 
                           backgroundColor: homeColorMap.get(getHomeKey(assignment.person)) ?? "grey.600",
 
-                          color: "common.white",
+                          color: "common.black",
 
                         }}
 
@@ -752,13 +786,13 @@ function TrainingSessionBuilder() {
 
                         <Box>
 
-                          <Typography variant="body1" sx={{ color: "common.white" }}>
+                          <Typography variant="body1" sx={{ color: "common.black" }}>
 
                             {assignment.person.name}
 
                           </Typography>
 
-                          <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
+                          <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
                             {assignment.person.role} � {assignment.person.status}
 
@@ -772,7 +806,7 @@ function TrainingSessionBuilder() {
 
                           size="small"
 
-                          sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "common.white" }}
+                          sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
 
                         />
 
@@ -852,7 +886,7 @@ function TrainingSessionBuilder() {
 
                     backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
 
-                    color: "common.white",
+                    color: "common.black",
 
                   }}
 
@@ -862,13 +896,13 @@ function TrainingSessionBuilder() {
 
                     <Box>
 
-                      <Typography variant="body1" sx={{ color: "common.white" }}>
+                      <Typography variant="body1" sx={{ color: "common.black" }}>
 
                         {person.name}
 
                       </Typography>
 
-                      <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
+                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
                         {person.role} � due {person.nextDue ? formatDate(person.nextDue) : "no date"}
 
@@ -882,13 +916,13 @@ function TrainingSessionBuilder() {
 
                       size="small"
 
-                      sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "common.white" }}
+                      sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
 
                     />
 
                   </Stack>
 
-                  <Typography variant="caption" sx={{ color: "common.white", opacity: 0.9 }}>
+                  <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
                     Home: {person.home} · last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "–"}
 
