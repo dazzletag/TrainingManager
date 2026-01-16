@@ -13,6 +13,13 @@ import { In } from "typeorm";
 
 const router = Router();
 
+const excludedNames = new Set(["rich crocker", "linda warren"]);
+
+function isExcludedPerson(person: Person) {
+  const name = person.fullName?.toLowerCase() ?? "";
+  return name.includes("agency") || excludedNames.has(name);
+}
+
 function resolveRequirementMeta(
   requirement: TrainingRequirement,
   groupMeta?: { requiredLevel: number; mandatory: boolean },
@@ -129,11 +136,12 @@ router.get("/overview", async (_req, res) => {
         relations: { role: true, groups: true },
       })
     : [];
-  const personMap = new Map(personList.map((person) => [person.id, person]));
+  const filteredPersonList = personList.filter((person) => !isExcludedPerson(person));
+  const personMap = new Map(filteredPersonList.map((person) => [person.id, person]));
   const assignmentMap = new Map(mandatoryAssignments.map((assignment) => [assignment.person.id, assignment]));
 
   const groupIds = Array.from(
-    new Set(personList.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
+    new Set(filteredPersonList.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
   );
   const groupLinks = groupIds.length
     ? await requirementGroupRepo.find({
@@ -145,7 +153,12 @@ router.get("/overview", async (_req, res) => {
   );
 
   const assignedPersonIds = new Set(
-    sessions.flatMap((session) => session.assignments.map((assignment) => assignment.person.id)),
+    sessions.flatMap((session) =>
+      session.assignments
+        .map((assignment) => assignment.person)
+        .filter((person) => person && !isExcludedPerson(person))
+        .map((person) => person.id),
+    ),
   );
 
   const overview = sessions.map((session) => {
@@ -153,6 +166,9 @@ router.get("/overview", async (_req, res) => {
       .filter((assignment) => assignment.day === 1)
       .map((assignment) => {
         const person = personMap.get(assignment.person.id) ?? assignment.person;
+        if (!person || isExcludedPerson(person)) {
+          return null;
+        }
         return {
           id: assignment.id,
           dropZoneId: assignment.dropZoneId,
@@ -177,6 +193,9 @@ router.get("/overview", async (_req, res) => {
       .filter((assignment) => assignment.day === 2)
       .map((assignment) => {
         const person = personMap.get(assignment.person.id) ?? assignment.person;
+        if (!person || isExcludedPerson(person)) {
+          return null;
+        }
         return {
           id: assignment.id,
           dropZoneId: assignment.dropZoneId,
@@ -207,12 +226,12 @@ router.get("/overview", async (_req, res) => {
       day1EndTime: session.day1EndTime,
       day2StartTime: session.day2StartTime,
       day2EndTime: session.day2EndTime,
-      day1Assignments,
-      day2Assignments,
+      day1Assignments: day1Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
+      day2Assignments: day2Assignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null),
     };
   });
 
-  const unassigned = personList
+  const unassigned = filteredPersonList
     .filter((person) => !assignedPersonIds.has(person.id))
     .map((person) => {
       const compliance = summarizeCompliance(
