@@ -102,15 +102,19 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
       holidayStatuses.has(absence.status?.toLowerCase() ?? ""),
     );
   } catch (error) {
+    const status = (error as any)?.response?.status;
+    if (status === 404) {
+      return false;
+    }
     console.warn("Unable to read absences for", externalId, error);
     return false;
   }
 }
 
-async function removeExistingShifts(externalId: string, window: ShiftWindow): Promise<void> {
+async function removeExistingShifts(externalId: string, window: ShiftWindow): Promise<boolean> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
-    return;
+    return false;
   }
   try {
     const response = await withRetry(() =>
@@ -125,13 +129,18 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
     );
 
     const shifts = response.data?.data ?? [];
+    if (!shifts.length) {
+      return true;
+    }
     await Promise.all(
       shifts.map((shift) =>
         withRetry(() => plandaySchedulingClient.delete(`/shifts/${shift.id}`, { headers })),
       ),
     );
+    return true;
   } catch (error) {
     console.warn("Unable to delete existing shifts for", externalId, error);
+    return false;
   }
 }
 
@@ -207,7 +216,15 @@ export async function assignToTrainingShift(
     };
     }
 
-    await removeExistingShifts(externalId, window);
+    const removed = await removeExistingShifts(externalId, window);
+    if (!removed) {
+      return {
+        personId,
+        day,
+        moved: false,
+        reason: "Unable to remove existing shifts",
+      };
+    }
     await createTrainingShift(externalId, window, sessionName, sessionId, day);
 
     return {
