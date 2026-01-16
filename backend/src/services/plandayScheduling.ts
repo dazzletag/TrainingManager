@@ -156,10 +156,6 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
         employeeGroupId: shift.employeeGroupId,
         employeeId: "",
         endDateTime: shift.endDateTime,
-        positionId: shift.positionId,
-        punchClockShiftId: shift.punchClockShiftId,
-        shiftTypeId: shift.shiftTypeId,
-        skillIds: shift.skillIds,
         startDateTime: shift.startDateTime,
       });
       await withRetry(() =>
