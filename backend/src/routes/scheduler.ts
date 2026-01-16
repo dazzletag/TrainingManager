@@ -80,6 +80,17 @@ function getTrainingDates(evidenceEntries: Evidence[]) {
   return { nextDue, lastTrainingAt };
 }
 
+function toIsoString(value?: Date | string | null) {
+  if (!value) {
+    return undefined;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+}
+
 router.get("/overview", async (_req, res) => {
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
@@ -190,8 +201,8 @@ router.get("/overview", async (_req, res) => {
       id: session.id,
       name: session.name,
       type: session.type,
-      day1: session.day1.toISOString(),
-      day2: session.day2.toISOString(),
+      day1: toIsoString(session.day1),
+      day2: toIsoString(session.day2),
       day1Assignments,
       day2Assignments,
     };
