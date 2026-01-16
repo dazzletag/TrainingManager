@@ -1,0 +1,631 @@
+Screens:
+  scrScheduler:
+    Properties:
+      LoadingSpinnerColor: =RGBA(56, 96, 178, 1)
+      OnVisible: |+
+        =UpdateContext({ctxDragDropEvent:"Reset" & Rand()});
+
+
+    Children:
+      - conRoot:
+          Control: GroupContainer@1.4.0
+          Variant: ManualLayout
+          Properties:
+            DropShadow: =DropShadow.None
+            Height: =Parent.Height
+            PaddingRight: =0.00
+            PaddingTop: =0.00
+            RadiusBottomLeft: =0
+            RadiusBottomRight: =0
+            RadiusTopLeft: =0
+            RadiusTopRight: =0
+            Width: =Parent.Width
+            X: =0.00
+          Children:
+            - conCalendar:
+                Control: GroupContainer@1.4.0
+                Variant: AutoLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  Height: =590
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutOverflowX: =LayoutOverflow.Scroll
+                  PaddingRight: =0.00
+                  PaddingTop: =0.00
+                  RadiusBottomLeft: =0
+                  RadiusBottomRight: =0
+                  RadiusTopLeft: =0
+                  RadiusTopRight: =0
+                  Width: =158
+                  X: =20.00
+                  Y: =139
+                Children:
+                  - PowerDragDrop2_1:
+                      Control: CodeComponent
+                      ComponentName: pdd_CustomControl.PowerDragDrop
+                      Properties:
+                        DelaySelect: ='CustomControl.PowerDragDrop.DelaySelect'.TouchOnly
+                        Direction: ='CustomControl.PowerDragDrop.Direction'.Vertical
+                        DropZoneID: ="UnassignedD1"
+                        FillPortions: =1
+                        Height: =680
+                        IdColumn: ="id"
+                        InputEvent: =ctxDragDropEvent
+                        IsMasterZone: =true
+                        ItemBackgroundColor: =
+                        ItemBorderColor: ="black"
+                        ItemBorderWidth: =2
+                        ItemTemplate: "=\"<div style='\n    position: relative;\n    background-color: {{background}};\n    width: 135px;\n    height:80;\n    border-right:7px solid #0078D7;\n    color: #FFFF;\n    border-radius:2px;\n    padding:8px;\n    text-align:left;\n'> \n    <div style='position: absolute; top: 0; right:0; text-align:right;'>\n        D1 \n    </div>         \n{{FullName}}<br/>\nDue {{'Mandatory Training Due'}}<br/>\n{{jobTitle}}\n \n</div>\""
+                        Items: |-
+                          =
+                          If(Len(TextInput1.Text)>0,SortByColumns(Filter(Withhomesx,Not('custom_28194.value'="True")&&Not('custom_28300.value'="True")&&Len('Mandatory Training Due')>0,TextInput1.Text in lastName),"custom_28191_x002e_value",SortOrder.Ascending),SortByColumns(Filter(Withhomesx,Not('custom_28194.value'="True")&&Not('custom_28300.value'="True")&&Len('Mandatory Training Due')>0),"custom_28191_x002e_value",SortOrder.Ascending))
+                        LayoutMaxHeight: =
+                        LayoutMaxWidth: =
+                        LayoutMinWidth: =20
+                        OtherDropZoneIDs: =Concat(colSessions,TrainingSessionD1,",")
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        RotateOnDrag: ='CustomControl.PowerDragDrop.RotateOnDrag'.None
+                        Width: |+
+                          =150
+                        X: =0.00
+                        Y: =40
+                        ZoneColumn: ="SessionD1"
+            - Gallery4_1:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Horizontal_TwoTextOneImageVariant_ver4.0
+                Properties:
+                  BorderColor: =RGBA(0, 18, 107, 1)
+                  DelayItemLoading: =false
+                  Height: |+
+                    =Parent.Height - Self.Y - 20
+                  Items: |-
+                    =Sort(Filter(colSessions,'Day 1'>DatePicker1.SelectedDate
+                    &&Text('Type of Training')="Mandatory Training"
+                    ),'Day 1',SortOrder.Ascending)
+                  LoadingSpinner: =LoadingSpinner.None
+                  OnSelect: =Set(delview,false)
+                  TemplatePadding: =0.00
+                  TemplateSize: =PowerDragDrop1_1.Width*2.5
+                  Width: =Parent.Width
+                  X: =TextInput1.Width+50
+                  Y: =40
+                Children:
+                  - Title3_1:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Font: =Font.'Open Sans'
+                        FontWeight: =FontWeight.Semibold
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        Size: =16.01
+                        Text: =ThisItem.'Type of Training'&" ("& Max(CountRows(Filter(PowerDragDrop2_1.CurrentItems,Text(DropZoneId)=Text(ThisItem.TrainingSessionD1))),CountRows(Filter(PowerDragDrop2_2.CurrentItems,Text(DropZoneId)=Text(ThisItem.TrainingSessionD2))))&")"
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =254.00
+                        X: =4.00
+                  - Subtitle3_1:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 0, 0, 1)
+                        Font: =Font.'Open Sans'
+                        Height: =70
+                        OnSelect: =Select(Parent)
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        Size: =15.00
+                        Text: =Text(Date(Year(ThisItem.'Day 1'),Month(ThisItem.'Day 1'),Day(ThisItem.'Day 1')),"dd/mm/yyyy")&" - "&Text(Date(Year(ThisItem.'Day 2'),Month(ThisItem.'Day 2'),Day(ThisItem.'Day 2')),"dd/mm/yyyy")
+                        VerticalAlign: =VerticalAlign.Top
+                        Width: =254.00
+                        X: =4.00
+                        Y: =40
+                  - PowerDragDrop1_1:
+                      Control: CodeComponent
+                      ComponentName: pdd_CustomControl.PowerDragDrop
+                      Properties:
+                        BackgroundColor: ="cornsilk"
+                        BorderColor: ="Burlywood"
+                        DelaySelect: ='CustomControl.PowerDragDrop.DelaySelect'.No
+                        Direction: ='CustomControl.PowerDragDrop.Direction'.Vertical
+                        DropZoneID: =ThisItem.TrainingSessionD1
+                        Height: =Gallery4_1.TemplateHeight - Self.Y - 10
+                        IdColumn: ="id"
+                        InputEvent: =ctxDragDropEvent
+                        ItemBorderRadius: =1
+                        ItemGap: =1
+                        ItemTemplate: |-
+                          ="<div style='
+                              position: relative;
+                              background-color: {{background}};
+                              width: 95%;
+                              min-height: 3.4em;
+                              border-right:7px solid #0078D7;
+                              color: #FFFF;
+                              border-radius:0.2em;
+                              padding:0.5em;
+                              text-align:left;
+                              box-sizing: border-box;
+                              word-break: break-word;
+                              font-size: 0.9em;
+                          '>
+                              <div style='
+                                  position: absolute;
+                                  top: 0.2em;
+                                  right: 0.3em;
+                                  font-size: 0.75em;
+                                  opacity: 0.9;
+                              '>
+                                  D1
+                              </div>
+
+                              {{FullName}}<br/>
+                              {{JobTitle}}
+                          </div>
+
+                          "
+                        Items: =Sort(Withhomesx,primaryDepartmentId,SortOrder.Ascending)
+                        OtherDropZoneIDs: ="UnassignedD1"
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        RotateOnDrag: ='CustomControl.PowerDragDrop.RotateOnDrag'.None
+                        Width: =Parent.Width/6-15
+                        X: =5
+                        Y: =110
+                        ZoneColumn: ="SessionD1"
+                  - PowerDragDrop1_2:
+                      Control: CodeComponent
+                      ComponentName: pdd_CustomControl.PowerDragDrop
+                      Properties:
+                        BackgroundColor: ="cornsilk"
+                        BorderColor: ="Burlywood"
+                        DelaySelect: ='CustomControl.PowerDragDrop.DelaySelect'.No
+                        Direction: ='CustomControl.PowerDragDrop.Direction'.Vertical
+                        DropZoneID: |+
+                          =ThisItem.TrainingSessionD2
+                        Height: =Gallery4_1.TemplateHeight - Self.Y - 10
+                        IdColumn: ="id"
+                        InputEvent: =ctxDragDropEvent
+                        ItemBorderRadius: =1
+                        ItemGap: =1
+                        ItemTemplate: |-
+                          ="<div style='
+                              position: relative;
+                              background-color: {{background}};
+                              width: 95%;
+                              min-height: 3.4em;
+                              border-right:7px solid #0078D7;
+                              color: #FFFF;
+                              border-radius:0.2em;
+                              padding:0.5em;
+                              text-align:left;
+                              box-sizing: border-box;
+                              word-break: break-word;
+                              font-size: 0.9em;
+                          '>
+                              <div style='
+                                  position: absolute;
+                                  top: 0.2em;
+                                  right: 0.3em;
+                                  font-size: 0.75em;
+                                  opacity: 0.9;
+                              '>
+                                  D2
+                              </div>
+
+                              {{FullName}}<br/>
+                              {{jobTitle}}
+                          </div>
+
+                          "
+                        Items: =Sort(Withhomesx,primaryDepartmentId,SortOrder.Ascending)
+                        OtherDropZoneIDs: ="UnassignedD2"
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        RotateOnDrag: ='CustomControl.PowerDragDrop.RotateOnDrag'.None
+                        Width: =Parent.Width/6-20
+                        X: =PowerDragDrop1_1.Width+15
+                        Y: =110
+                        ZoneColumn: ="SessionD2"
+                  - Label2:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        OnSelect: =Select(Parent)
+                        PaddingRight: =5.00
+                        PaddingTop: =5.00
+                        Size: =13.00
+                        Text: ="Day 1"
+                        Width: =126.00
+                        X: =16.01
+                        Y: =70
+                  - Label2_1:
+                      Control: Label@2.5.1
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        OnSelect: =Select(Parent)
+                        PaddingRight: =5.00
+                        PaddingTop: =5.00
+                        Size: =13.00
+                        Text: ="Day 2"
+                        Width: =85
+                        X: =163.00
+                        Y: =70
+                  - Icon1:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(0, 18, 107, 1)
+                        Height: =52
+                        Icon: =Icon.Cancel
+                        OnSelect: |+
+                          =Set(delview,true)
+                        Tooltip: ="Delete Session"
+                        Visible: =If(User().Email="Darren.taggart@bristolcarehomes.co.uk"||User().Email="Val.knight@bristolcarehomes.co.uk",true,false)
+                        Width: =47
+                        X: =253
+                        Y: =58
+                  - Button11:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(203, 102, 102, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(Color.Red, -20%)
+                        OnSelect: |-
+                          =RemoveIf('Training Sessions',TrainingSessionD1=ThisItem.TrainingSessionD1);ClearCollect(colSessions,AddColumns('Training Sessions',Zone,"Unassigned"));
+                          Set(delview,false)
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Text: ="Confirm Delete"
+                        Visible: =delview
+                        X: =152
+                        Y: =64
+                  - GetShifts:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Color: =RGBA(0, 18, 107, 1)
+                        Height: =51
+                        Icon: =Icon.AddToCalendar
+                        OnSelect: "=//UpdateContext({ctxDragDropEvent:\"Reset\"&Rand()});\r\n//Day 1\r\nClear(Holidays);\r\nClear(PlandayShifts1);\r\nClear(PlandayShifts2);\r\n\r\nClearCollect(colCurrentDnD, Filter(PowerDragDrop2_1.CurrentItems,Text(DropZoneId)=Text(ThisItem.TrainingSessionD1)));\r\nClearCollect(colToPost,\r\n    Ungroup(\r\n        DropColumns(\r\n            AddColumns(\r\n                colCurrentDnD,\r\n                Mygroupedcolumn,\r\n                Filter(\r\n                    colSessions,\r\n                    Text(TrainingSessionD1)=Text(colCurrentDnD[@DropZoneId])\r\n                )\r\n            ),\r\n            DropZoneId\r\n        ),\r\n        Mygroupedcolumn\r\n    )\r\n);\r\n\r\nClearCollect(colToSend, \r\n    AddColumns(\r\n        colToPost,PositionID,\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Quarry House\",\"20843\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Beech House\",\"20842\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Field House\",\"20845\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Glebe House\",\"20728\",\"\")))),\r\n        GroupId,\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Quarry House\",\"21754\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Beech House\",\"21752\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Field House\",\"21755\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Glebe House\",\"21753\",\"\"))))));\r\n\r\n\r\nClearCollect(\r\n    PlandayShiftsRaw,\r\n    Planday.GetShifts({\r\n        from: Text(ThisItem.'Day 1', \"yyyy-mm-dd\"),\r\n        to:   Text(ThisItem.'Day 1', \"yyyy-mm-dd\"),\r\n        'X-ClientId': \"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n        offset:0,\r\n        Limit: \"5000\"\r\n    }).data\r\n);\r\n\r\nClearCollect(\r\n    PlandayShifts1,\r\n    Planday.GetShifts({\r\n        from: Text(ThisItem.'Day 1', \"yyyy-mm-dd\"),\r\n        to:   Text(ThisItem.'Day 1', \"yyyy-mm-dd\"),\r\n        'X-ClientId': \"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n        \r\n        Limit: \"5000\"\r\n    }).data\r\n);\r\nRemoveIf(PlandayShifts1, !(employeeId in Concat(colToSend,ItemId,\",\"))\r\n||Len(employeeId)<3\r\n);        \r\n\r\nForAll(PlandayShifts1,\r\n    If(PlandayShifts1[@shiftTypeId]=70768||Text(PlandayShifts1[@shiftTypeId])=\"70768\",\r\n        Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts1[@employeeId]),FullName),Type: \"Holiday\",Date: PlandayShifts1[@date]}),\r\n        If(PlandayShifts1[@shiftTypeId]=71868,\r\n            Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts1[@employeeId]),FullName),Type: \"Unpaid Leave\",Date: PlandayShifts1[@date]}),\r\n            If(PlandayShifts1[@shiftTypeId]=71851,\r\n                Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts1[@employeeId]),FullName),Type: \"Sick Leave\",Date: PlandayShifts1[@date]}),\r\n                Collect(Updates,Planday.UpdateShift(PlandayShifts1[@id],{\r\n                    'X-ClientId':\"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n                    allowConflicts:false,\r\n                    employeeId:\"\",\r\n                    date:PlandayShifts1[@date],\r\n                    startTime:Right(PlandayShifts1[@startDateTime],5),\r\n                    endTime:Right(PlandayShifts1[@endDateTime],5),\r\n                    employeeGroupId:PlandayShifts1[@employeeGroupId],\r\n                    comment:\"Set to open for Mandatory Training\"\r\n                    }\r\n                )\r\n                )\r\n                \r\n                )\r\n            ))\r\n        );\r\nForAll(colToSend,\r\n\r\n    Planday.CreateShift({\r\n        allowConflicts:false,\r\n        'X-ClientId':\"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n        date:Text(crff5_startdate,\"yyyy-mm-dd\"),\r\n        comment:ThisItem.'Type of Training',\r\n        shiftTypeId:71233,\r\n        departmentId:7770,\r\n        startTime:\"09:15\",\r\n        endTime:\"15:45\",\r\n        useBreaks:true,\r\n        employeeGroupId:GroupId,\r\n        positionId:PositionID,\r\n        employeeId:ItemId});\r\n    \r\n    );\r\n\r\n\r\n//Day Two\r\n\r\nClear(PlandayShifts2);\r\n\r\n\r\nClearCollect(colCurrentDnD, Filter(PowerDragDrop2_2.CurrentItems,Text(DropZoneId)=Text(ThisItem.TrainingSessionD2)));\r\nClearCollect(colToPost,\r\n    Ungroup(\r\n        DropColumns(\r\n            AddColumns(\r\n                colCurrentDnD,\r\n                Mygroupedcolumn,\r\n                Filter(\r\n                    colSessions,\r\n                    Text(TrainingSessionD2)=Text(colCurrentDnD[@DropZoneId])\r\n                )\r\n            ),\r\n            DropZoneId\r\n        ),\r\n        Mygroupedcolumn\r\n    )\r\n);\r\n\r\nClearCollect(colToSend, \r\n    AddColumns(\r\n        colToPost,PositionID,\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Quarry House\",\"20843\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Beech House\",\"20842\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Field House\",\"20845\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Glebe House\",\"20728\",\"\")))),\r\n        GroupId,\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Quarry House\",\"21754\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Beech House\",\"21752\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Field House\",\"21755\",\r\n        If(LookUp(Withhomesx,Text(ItemId)=Text(id),Home)=\"Glebe House\",\"21753\",\"\"))))));\r\n\r\n\r\n\r\nClearCollect(PlandayShifts2,Planday.GetShifts({              \r\n        //employeeId:\"\",\r\n        from:Text(Date(Year(ThisItem.'Day 2'),Month(ThisItem.'Day 2'),Day(ThisItem.'Day 2')),\"yyyy-mm-dd\"),\r\n        to:Text(Date(Year(ThisItem.'Day 2'),Month(ThisItem.'Day 2'),Day(ThisItem.'Day 2')),\"yyyy-mm-dd\"),\r\n        'X-ClientId':\"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n        Limit:\"5000\"}).data);\r\nRemoveIf(PlandayShifts2, !(employeeId in Concat(colToSend,ItemId,\",\"))||Len(employeeId)<3);    \r\n\r\nForAll(PlandayShifts2,\r\n    If(PlandayShifts2[@shiftTypeId]=70768||Text(PlandayShifts2[@shiftTypeId])=\"70768\",\r\n        Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts2[@employeeId]),FullName),Type: \"Holiday\",Date: PlandayShifts2[@date]}),\r\n        If(PlandayShifts2[@shiftTypeId]=71868,\r\n            Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts2[@employeeId]),FullName),Type: \"Unpaid Leave\",Date: PlandayShifts2[@date]}),\r\n            If(PlandayShifts2[@shiftTypeId]=71851,\r\n                Collect(Holidays,{Name: LookUp(Withhomesx,Text(id)=Text(PlandayShifts2[@employeeId]),FullName),Type: \"Sick Leave\",Date: PlandayShifts2[@date]}),\r\n                Collect(Updates,Planday.UpdateShift(PlandayShifts2[@id],{\r\n                    'X-ClientId':\"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n                    allowConflicts:false,\r\n                    employeeId:\"\",\r\n                    date:PlandayShifts2[@date],\r\n                    startTime:Right(PlandayShifts2[@startDateTime],5),\r\n                    endTime:Right(PlandayShifts2[@endDateTime],5),\r\n                    employeeGroupId:PlandayShifts2[@employeeGroupId],\r\n                    comment:\"Set to open for Mandatory Training\"\r\n                    }\r\n                )\r\n                )\r\n                )\r\n            )\r\n        )\r\n    );\r\n\r\n\r\nIf(CountRows(Holidays)>0,Set(HolRept,\"true\"));\r\n\r\nForAll(colToSend,\r\n\r\n    \r\n    Planday.CreateShift({\r\n        allowConflicts:false,\r\n        'X-ClientId':\"a079a6c5-a90f-45e9-8bd1-a1dcd3002cc3\",\r\n        date: Text(crff5_enddate,\"yyyy-mm-dd\"),\r\n        comment:ThisItem.'Type of Training',\r\n        shiftTypeId:71233,\r\n        departmentId:7770,\r\n        startTime:\"09:15\",\r\n        endTime:\"15:45\",\r\n        useBreaks:true,\r\n        employeeGroupId:GroupId,\r\n        positionId:PositionID,\r\n        employeeId:Value(ItemId)})\r\n    );\r\n\r\n\r\n\r\nClearCollect(colToSaved1,AddColumns(Filter(PowerDragDrop2_1.CurrentItems,HasMovedZone=true),DayList,\"Day1\"));\r\nForAll(colToSaved1,\r\n   Patch(SaveMandatories, LookUp(SaveMandatories,DayList=\"Day1\"&& ItemID=ItemId),\r\n   {\r\n       DayList:colToSaved1[@DayList], \r\n       DropzoneID:colToSaved1[@DropZoneId],\r\n       ItemID:colToSaved1[@ItemId],\r\n       PositionID:colToSaved1[@Position]\r\n       }\r\n       )\r\n       );\r\n\r\nClearCollect(colToSaved2,AddColumns(Filter(PowerDragDrop2_2.CurrentItems,HasMovedZone=true),DayList,\"Day2\"));       \r\nForAll(colToSaved2,\r\n   Patch(SaveMandatories, LookUp(SaveMandatories,DayList=\"Day2\"&&ItemID=ItemId),\r\n   {\r\n       DayList:colToSaved2[@DayList], \r\n       DropzoneID:colToSaved2[@DropZoneId],\r\n       ItemID:colToSaved2[@ItemId],\r\n       PositionID:colToSaved2[@Position]\r\n       }\r\n       )\r\n       );"
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        Visible: |-
+                          =If(User().Email="Darren.taggart@bristolcarehomes.co.uk"||User().Email="Val.knight@bristolcarehomes.co.uk",
+                          If(Or(IfError(First(PowerDragDrop2_1.CurrentItems).ItemId,false,true)=false,IfError(First(PowerDragDrop2_2.CurrentItems).ItemId,false,true)=false),false,true),false)
+                        Width: =57.00
+                        X: =258
+                        Y: =7
+            - conCalendar_1:
+                Control: GroupContainer@1.4.0
+                Variant: AutoLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  Height: =589
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutOverflowX: =LayoutOverflow.Scroll
+                  PaddingRight: =0.00
+                  PaddingTop: =0.00
+                  RadiusBottomLeft: =0
+                  RadiusBottomRight: =0
+                  RadiusTopLeft: =0
+                  RadiusTopRight: =0
+                  Width: =148
+                  X: =193.00
+                  Y: =139
+                Children:
+                  - PowerDragDrop2_2:
+                      Control: CodeComponent
+                      ComponentName: pdd_CustomControl.PowerDragDrop
+                      Properties:
+                        DelaySelect: ='CustomControl.PowerDragDrop.DelaySelect'.No
+                        Direction: ='CustomControl.PowerDragDrop.Direction'.Vertical
+                        DropZoneID: ="UnassignedD2"
+                        FillPortions: =1
+                        Height: =680
+                        IdColumn: ="id"
+                        InputEvent: =ctxDragDropEvent
+                        IsMasterZone: =true
+                        ItemBackgroundColor: =
+                        ItemBorderColor: ="black"
+                        ItemBorderWidth: =2
+                        ItemTemplate: "=\"<div style='\n    position: relative;\n    background-color: {{background}};\n    width: 135px;\n    height:80;\n    border-right:7px solid #0078D7;\n    color: #FFFF;\n    border-radius:2px;\n    padding:8px;\n    text-align:left;\n'> \n    <div style='position: absolute; top: 0; right:0; text-align:right;'>\n        D2 \n    </div>         \n{{FullName}}<br/>\nDue {{'Mandatory Training Due'}}<br/>\n{{jobTitle}}\n \n</div>\""
+                        Items: |-
+                          =If(
+                              Len(TextInput1.Text) > 0,
+                              Filter(
+                                  Withhomesx,
+                                  Not('custom_28194.value' = "True") && Not('custom_28300.value' = "True") && Len('Mandatory Training Due') > 0,
+                                  TextInput1.Text in lastName
+                              ),
+                              Filter(
+                                  Withhomesx,
+                                  Not('custom_28194.value' = "True") && Not('custom_28300.value' = "True") && Len('Mandatory Training Due') > 0
+                              )
+                          )
+                        LayoutMaxHeight: =
+                        LayoutMaxWidth: =
+                        LayoutMinWidth: =20
+                        OtherDropZoneIDs: =Concat(colSessions,TrainingSessionD2,",")
+                        PaddingRight: =0.00
+                        PaddingTop: =0.00
+                        RotateOnDrag: ='CustomControl.PowerDragDrop.RotateOnDrag'.None
+                        Width: =166.72
+                        X: =0.00
+                        Y: =40
+                        ZoneColumn: ="SessionD2"
+            - Button9_1:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  BorderColor: =ColorFade(Self.Fill, -15%)
+                  Color: =RGBA(255, 255, 255, 1)
+                  DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                  Fill: =RGBA(56, 96, 178, 1)
+                  Font: =Font.'Open Sans'
+                  HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  OnSelect: |-
+                    =ClearCollect(
+                        SavedSessions,
+                        AddColumns(
+                            FirstN(SortByColumns(SaveMandatories,"modifiedon",SortOrder.Descending),1000),
+                                    lookerup,ItemID&DayList
+                                    ));
+
+                    ClearCollect(Withhomesx, AddColumns(Sort(Employees1,'custom_28191.value'),Home,LookUp(Homes,primaryDepartmentId=Text(id)).name,
+                    SessionD1,If(Len(LookUp(SavedSessions,lookerup=id&"Day1",DropzoneID))<1,"UnassignedD1",LookUp(SavedSessions,lookerup=id&"Day1",DropzoneID)),
+                    SessionD2,If(Len(LookUp(SavedSessions,lookerup=id&"Day2",DropzoneID))<1,"UnassignedD2",LookUp(SavedSessions,lookerup=id&"Day2",DropzoneID)),
+                    FullName,firstName&" "&lastName,'Mandatory Training Due','custom_28191.value',background,If(primaryDepartmentId="7653","#648133",If(primaryDepartmentId="7655","#156F9F",If(primaryDepartmentId="7652","#A61D5F",If(primaryDepartmentId="7654","#603863","grey"))))));
+
+                    ClearCollect(colSessions,AddColumns('Training Sessions',Zone,"Unassigned"));
+                    Set(delview,false);
+
+
+                    UpdateContext({ctxDragDropEvent: "Reset" & Rand()});
+                  PaddingRight: =5.00
+                  PaddingTop: =5.00
+                  PressedBorderColor: =Self.Fill
+                  PressedColor: =Self.Fill
+                  PressedFill: =Self.Color
+                  Size: =15.00
+                  Text: ="Load"
+                  Visible: =If(User().Email="Darren.taggart@bristolcarehomes.co.uk"||User().Email="Val.knight@bristolcarehomes.co.uk",true,false)
+                  Width: =88
+                  X: =1248
+                  Y: =99
+            - HolidayShifts:
+                Control: GroupContainer@1.4.0
+                Variant: ManualLayout
+                Properties:
+                  DropShadow: =DropShadow.None
+                  Fill: =Color.White
+                  Height: =385
+                  RadiusBottomLeft: =0
+                  RadiusBottomRight: =0
+                  RadiusTopLeft: =0
+                  RadiusTopRight: =0
+                  Visible: =HolRept
+                  Width: =772
+                  X: =564
+                  Y: =219
+                Children:
+                  - DataTable8:
+                      Control: DataTable@1.0.3
+                      Properties:
+                        BorderColor: =RGBA(0, 18, 107, 1)
+                        Font: =Font.'Open Sans'
+                        HeadingColor: =RGBA(255, 255, 255, 1)
+                        HeadingFill: =RGBA(56, 96, 178, 1)
+                        HeadingFont: =Font.'Open Sans'
+                        Height: =385
+                        HoverFill: =RGBA(186, 202, 226, .2)
+                        Items: =Holidays
+                        SelectedFill: =RGBA(56, 96, 178, .2)
+                        Width: =772
+                      Children:
+                        - Date_Column1:
+                            Control: DataTableColumn@1.0.1
+                            Variant: Textual
+                            IsLocked: true
+                            Properties:
+                              FieldDisplayName: ="Date"
+                              FieldName: ="Date"
+                              Order: =1
+                              Text: =ThisItem.Date
+                        - Name_Column1:
+                            Control: DataTableColumn@1.0.1
+                            Variant: Textual
+                            IsLocked: true
+                            Properties:
+                              FieldDisplayName: ="Name"
+                              FieldName: ="Name"
+                              Order: =2
+                              Text: =ThisItem.Name
+                        - Type_Column1:
+                            Control: DataTableColumn@1.0.1
+                            Variant: Textual
+                            IsLocked: true
+                            Properties:
+                              FieldDisplayName: ="Type"
+                              FieldName: ="Type"
+                              Order: =3
+                              Text: =ThisItem.Type
+                  - Button10:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        BorderColor: =ColorFade(Self.Fill, -15%)
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                        Fill: =RGBA(56, 96, 178, 1)
+                        Font: =Font.'Open Sans'
+                        HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                        OnSelect: =Set(HolRept,"false")
+                        PressedBorderColor: =Self.Fill
+                        PressedColor: =Self.Fill
+                        PressedFill: =Self.Color
+                        Text: ="OK"
+                        X: =892
+                        Y: =160
+      - conFunctions:
+          Control: GroupContainer@1.4.0
+          Variant: ManualLayout
+          Properties:
+            DropShadow: =DropShadow.None
+            Height: =612
+            PaddingRight: =0.00
+            PaddingTop: =0.00
+            RadiusBottomLeft: =0
+            RadiusBottomRight: =0
+            RadiusTopLeft: =0
+            RadiusTopRight: =0
+            Width: =139
+            X: =1224
+            Y: =152
+          Children:
+            - Button5:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  BorderColor: =ColorFade(Self.Fill, -15%)
+                  Color: =RGBA(255, 255, 255, 1)
+                  DisabledBorderColor: =RGBA(166, 166, 166, 1)
+                  Fill: =RGBA(56, 96, 178, 1)
+                  Font: =Font.'Open Sans'
+                  Height: =85
+                  HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+                  OnSelect: =Navigate('Create Sessions',ScreenTransition.Fade)
+                  PaddingRight: =5.00
+                  PaddingTop: =5.00
+                  PressedBorderColor: =Self.Fill
+                  PressedColor: =Self.Fill
+                  PressedFill: =Self.Color
+                  Size: =15.00
+                  Text: ="Create New Sessions"
+                  Visible: =If(User().Email="Darren.taggart@bristolcarehomes.co.uk"||User().Email="Val.knight@bristolcarehomes.co.uk",true,false)
+                  Width: =93
+                  X: =24
+      - DatePicker1:
+          Control: Classic/DatePicker@2.6.0
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            DefaultDate: =Today()-3
+            Font: =Font.'Open Sans'
+            IconBackground: =RGBA(56, 96, 178, 1)
+            IconFill: =RGBA(255, 255, 255, 1)
+            PaddingRight: =5.00
+            PaddingTop: =0.00
+            Size: =14.00
+            Width: =303.00
+            X: =0.00
+      - Button8_1:
+          Control: Classic/Button@2.2.0
+          Properties:
+            BorderColor: =ColorFade(Self.Fill, -15%)
+            Color: =RGBA(255, 255, 255, 1)
+            DisabledBorderColor: =RGBA(166, 166, 166, 1)
+            Fill: =RGBA(56, 96, 178, 1)
+            Font: =Font.'Open Sans'
+            Height: =37
+            HoverBorderColor: =ColorFade(Self.BorderColor, 20%)
+            HoverColor: =RGBA(255, 255, 255, 1)
+            HoverFill: =ColorFade(RGBA(56, 96, 178, 1), -20%)
+            OnSelect: |-
+              =ClearCollect(colToSaved1,AddColumns(Filter(PowerDragDrop2_1.CurrentItems,HasMovedZone=true),DayList,"Day1"));
+
+              ForAll(colToSaved1,
+              If(CountRows(Filter(SaveMandatories,DayList="Day1"&&ItemID=ItemId))>0,
+              Patch(
+                  SaveMandatories, 
+                  LookUp(
+                      SaveMandatories,
+                      DayList="Day1"&&ItemID=ItemId),
+                      {
+                          DayList: DayList,
+                          DropzoneID: DropZoneId,
+                          ItemID: ItemId,
+                          PositionID: Position
+                          }
+                          ),
+                          Patch(
+                              SaveMandatories, 
+                              Defaults(SaveMandatories),
+                              {DayList: DayList,
+                              DropzoneID: DropZoneId,
+                              ItemID: ItemId,
+                              isarchived: false,
+                              PositionID: Position
+                              }
+                              )
+                          ));
+
+
+              ClearCollect(colToSaved2,AddColumns(Filter(PowerDragDrop2_2.CurrentItems,HasMovedZone=true),DayList,"Day2"));
+              ForAll(colToSaved2,
+                 If(CountRows(Filter(SaveMandatories,DayList="Day2"&&ItemID=ItemId))>0,
+                 Patch(SaveMandatories, 
+                 LookUp(SaveMandatories,DayList="Day2"&&ItemID=ItemId),
+                 {
+                     DayList:colToSaved2[@DayList], 
+                     DropzoneID:colToSaved2[@DropZoneId],
+                     ItemID:colToSaved2[@ItemId],
+                     PositionID:colToSaved2[@Position]
+                     }
+                     ),Patch(
+                              SaveMandatories, 
+                              Defaults(SaveMandatories),
+                              {DayList: DayList,
+                              DropzoneID: DropZoneId,
+                              ItemID: ItemId,
+                              isarchived: false,
+                              PositionID: Position
+                              }
+                              )
+                     ));
+            PaddingRight: =5.00
+            PaddingTop: =5.00
+            PressedBorderColor: =Self.Fill
+            PressedColor: =Self.Fill
+            PressedFill: =Self.Color
+            Size: =15.00
+            Text: ="Save"
+            Visible: =If(User().Email="Darren.taggart@bristolcarehomes.co.uk"||User().Email="Val.knight@bristolcarehomes.co.uk",true,false)
+            Width: =90
+            X: =1250
+            Y: =40
+      - TextInput1:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Default: =
+            Font: =Font.'Open Sans'
+            HoverBorderColor: =RGBA(0, 18, 107, 1)
+            HoverFill: =RGBA(186, 202, 226, 1)
+            Width: =308
+            X: =20
+            Y: =84
+      - Label5:
+          Control: Label@2.5.1
+          Properties:
+            BorderColor: =RGBA(0, 18, 107, 1)
+            Font: =Font.'Open Sans'
+            Height: =32
+            Text: ="Search by Surname"
+            Width: =272
+            X: =20
+            Y: =52

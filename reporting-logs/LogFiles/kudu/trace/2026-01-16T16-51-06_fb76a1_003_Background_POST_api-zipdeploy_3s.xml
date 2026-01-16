@@ -1,0 +1,35 @@
+<step title="BackgroundTrace" date="2026-01-16T16:51:06.928" instance="fb76a1" url="/api/zipdeploy" method="POST" >
+  <step title="Updating shutdown sentinel last write time" date="2026-01-16T16:51:06.959" SemaphoreCount="7" /><!-- duration: 16ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-01-16T16:51:06.990" /><!-- duration: 16ms -->
+  <step title="Creating temporary deployment" date="2026-01-16T16:51:07.021" /><!-- duration: 109ms -->
+  <step title="Performing fetch based deployment" date="2026-01-16T16:51:07.146" >
+    <step title="Fetching changes." date="2026-01-16T16:51:07.318" /><!-- duration: 16ms -->
+    <step title="Starting LocalZipHandler" date="2026-01-16T16:51:07.349" /><!-- duration: 16ms -->
+    <step title="Starting ExtractTriggers" date="2026-01-16T16:51:07.381" /><!-- duration: 16ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-01-16T16:51:07.443" /><!-- duration: 16ms -->
+    <step title="DeploymentManager.Deploy(id:67957fa6b1044065b1b0466f4d4406dd)" date="2026-01-16T16:51:07.474" >
+      <step title="Collecting changeset information" date="2026-01-16T16:51:07.506" /><!-- duration: 109ms -->
+      <step title="Updating submodules" date="2026-01-16T16:51:07.631" >
+        <step title="Updating submodules." date="2026-01-16T16:51:07.771" /><!-- duration: 16ms -->
+      </step><!-- duration: 172ms -->
+      <step title="Preparing deployment for commit id &apos;67957fa6b1&apos;." date="2026-01-16T16:51:07.928" /><!-- duration: 16ms -->
+      <step title="Determining deployment builder" date="2026-01-16T16:51:08.053" >
+        <step title="Builder is RunFromZipSiteBuilder" date="2026-01-16T16:51:08.068" /><!-- duration: 16ms -->
+      </step><!-- duration: 47ms -->
+      <step title="Copying SSH keys" date="2026-01-16T16:51:08.162" /><!-- duration: 31ms -->
+      <step title="Building" date="2026-01-16T16:51:08.209" >
+        <step title="Skipping build. Project type: Run-From-Zip" date="2026-01-16T16:51:08.334" /><!-- duration: 16ms -->
+        <step title="Skipping post build. Project type: Run-From-Zip" date="2026-01-16T16:51:08.474" /><!-- duration: 16ms -->
+        <step title="Triggering recycle (preview mode disabled)." date="2026-01-16T16:51:08.599" /><!-- duration: 16ms -->
+        <step title="Ignoring FS watcher based recycle request as this is a classic Windows app." date="2026-01-16T16:51:08.631" /><!-- duration: 16ms -->
+        <step title="Deployment successful. DEPLOYMENTINFO: deploymentPath = Functions App ZipDeploy. Run from package., deployer = az_cli_functions, os = windows, sku = Dynamic, language = node, siteName = trainingmanager-reporting, slotName = Production, siteHostName = trainingmanager-reporting.azurewebsites.net, deploymentStatus = Success" date="2026-01-16T16:51:08.771" /><!-- duration: 16ms -->
+      </step><!-- duration: 906ms -->
+    </step><!-- duration: 1656ms -->
+    <step title="Cleaning up temp files" date="2026-01-16T16:51:09.146" /><!-- duration: 16ms -->
+    <step title="Updating C:\home\data\SitePackages\packagename.txt with deployment 20260116165106.zip" date="2026-01-16T16:51:09.178" /><!-- duration: 47ms -->
+    <step title="Begin HttpPost https://trainingmanager-reporting.scm.azurewebsites.net/operations/settriggers, x-ms-request-id: 86350df6-f2fb-11f0-aa46-14ac6026c5ed" date="2026-01-16T16:51:09.287" /><!-- duration: 16ms -->
+    <step title="End HttpPost, status: OK" date="2026-01-16T16:51:09.599" /><!-- duration: 16ms -->
+    <step title="Scheduling background sync triggers after delay" date="2026-01-16T16:51:09.615" /><!-- duration: 16ms -->
+  </step><!-- duration: 2656ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-01-16T16:51:09.818" /><!-- duration: 16ms -->
+</step><!-- duration: 2922ms -->

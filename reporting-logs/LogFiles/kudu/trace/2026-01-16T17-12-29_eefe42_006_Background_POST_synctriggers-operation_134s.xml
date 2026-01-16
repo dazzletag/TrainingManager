@@ -1,0 +1,8 @@
+<step title="BackgroundTrace" date="2026-01-16T17:12:29.796" instance="eefe42" url="synctriggers-operation" method="POST" >
+  <step title="Updating shutdown sentinel last write time" date="2026-01-16T17:12:29.812" SemaphoreCount="6" /><!-- duration: 0ms -->
+  <step title="Delaying &apos;00:01:00&apos; for Functions site to restart." date="2026-01-16T17:12:29.828" /><!-- duration: 16ms -->
+  <step title="Begin HttpPost https://trainingmanager-reporting.azurewebsites.net/admin/host/synctriggers, x-ms-request-id: 807551f9-f2fe-11f0-9a4c-14ac6026c5ed" date="2026-01-16T17:13:29.888" /><!-- duration: 31ms -->
+  <step title="End HttpPost, status: OK" date="2026-01-16T17:14:43.446" /><!-- duration: 16ms -->
+  <step title="Syncing function triggers by calling the functions runtime site successful." date="2026-01-16T17:14:43.493" /><!-- duration: 16ms -->
+  <step title="Deleting shutdown sentinel file" date="2026-01-16T17:14:43.509" SemaphoreCount="8" /><!-- duration: 31ms -->
+</step><!-- duration: 133744ms -->

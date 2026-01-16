@@ -1,0 +1,38 @@
+<step title="BackgroundTrace" date="2026-01-16T17:12:25.890" instance="eefe42" url="/api/zipdeploy" method="POST" >
+  <step title="Updating shutdown sentinel last write time" date="2026-01-16T17:12:25.921" SemaphoreCount="7" /><!-- duration: 15ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-01-16T17:12:25.952" /><!-- duration: 16ms -->
+  <step title="Creating temporary deployment" date="2026-01-16T17:12:26.015" /><!-- duration: 156ms -->
+  <step title="Performing fetch based deployment" date="2026-01-16T17:12:26.187" >
+    <step title="Fetching changes." date="2026-01-16T17:12:26.343" /><!-- duration: 16ms -->
+    <step title="Starting LocalZipHandler" date="2026-01-16T17:12:26.374" /><!-- duration: 16ms -->
+    <step title="Starting ExtractTriggers" date="2026-01-16T17:12:26.405" /><!-- duration: 16ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-01-16T17:12:27.187" /><!-- duration: 16ms -->
+    <step title="DeploymentManager.Deploy(id:f15af3749de94fd9981c2b86bafb79ba)" date="2026-01-16T17:12:27.218" >
+      <step title="Collecting changeset information" date="2026-01-16T17:12:27.249" /><!-- duration: 109ms -->
+      <step title="Updating submodules" date="2026-01-16T17:12:27.374" >
+        <step title="Updating submodules." date="2026-01-16T17:12:27.515" /><!-- duration: 16ms -->
+      </step><!-- duration: 172ms -->
+      <step title="Preparing deployment for commit id &apos;f15af3749d&apos;." date="2026-01-16T17:12:27.671" /><!-- duration: 16ms -->
+      <step title="Determining deployment builder" date="2026-01-16T17:12:27.796" >
+        <step title="Builder is RunFromZipSiteBuilder" date="2026-01-16T17:12:27.812" /><!-- duration: 16ms -->
+      </step><!-- duration: 47ms -->
+      <step title="Copying SSH keys" date="2026-01-16T17:12:27.905" /><!-- duration: 16ms -->
+      <step title="Building" date="2026-01-16T17:12:27.937" >
+        <step title="Skipping build. Project type: Run-From-Zip" date="2026-01-16T17:12:28.093" /><!-- duration: 16ms -->
+        <step title="Skipping post build. Project type: Run-From-Zip" date="2026-01-16T17:12:28.233" /><!-- duration: 31ms -->
+        <step title="Triggering recycle (preview mode disabled)." date="2026-01-16T17:12:28.405" /><!-- duration: 16ms -->
+        <step title="Ignoring FS watcher based recycle request as this is a classic Windows app." date="2026-01-16T17:12:28.437" /><!-- duration: 16ms -->
+        <step title="Deployment successful. DEPLOYMENTINFO: deploymentPath = Functions App ZipDeploy. Run from package. Ignore remote build., deployer = az_cli_functions, os = windows, sku = Dynamic, language = node, siteName = trainingmanager-reporting, slotName = Production, siteHostName = trainingmanager-reporting.azurewebsites.net, deploymentStatus = Success" date="2026-01-16T17:12:28.577" /><!-- duration: 16ms -->
+        <step title="Purge deployment items" date="2026-01-16T17:12:28.859" >
+          <step title="Remove 84a26d5bf, Failed, received at 1/16/2026 5:08:25 PM" date="2026-01-16T17:12:29.031" /><!-- duration: 31ms -->
+        </step><!-- duration: 219ms -->
+      </step><!-- duration: 1203ms -->
+    </step><!-- duration: 1938ms -->
+    <step title="Cleaning up temp files" date="2026-01-16T17:12:29.171" /><!-- duration: 16ms -->
+    <step title="Updating C:\home\data\SitePackages\packagename.txt with deployment 20260116171223.zip" date="2026-01-16T17:12:29.203" /><!-- duration: 47ms -->
+    <step title="Begin HttpPost https://trainingmanager-reporting.scm.azurewebsites.net/operations/settriggers, x-ms-request-id: 807551f9-f2fe-11f0-9a4c-14ac6026c5ed" date="2026-01-16T17:12:29.343" /><!-- duration: 16ms -->
+    <step title="End HttpPost, status: OK" date="2026-01-16T17:12:29.718" /><!-- duration: 16ms -->
+    <step title="Scheduling background sync triggers after delay" date="2026-01-16T17:12:29.765" /><!-- duration: 16ms -->
+  </step><!-- duration: 3719ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-01-16T17:12:29.937" /><!-- duration: 16ms -->
+</step><!-- duration: 4094ms -->

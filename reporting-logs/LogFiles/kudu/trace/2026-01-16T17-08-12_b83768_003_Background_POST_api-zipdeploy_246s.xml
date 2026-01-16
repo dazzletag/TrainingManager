@@ -1,0 +1,144 @@
+<step title="BackgroundTrace" date="2026-01-16T17:08:12.066" instance="b83768" url="/api/zipdeploy" method="POST" >
+  <step title="Updating shutdown sentinel last write time" date="2026-01-16T17:08:12.114" SemaphoreCount="7" /><!-- duration: 15ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-01-16T17:08:12.145" /><!-- duration: 16ms -->
+  <step title="Creating temporary deployment" date="2026-01-16T17:08:12.176" /><!-- duration: 141ms -->
+  <step title="Performing fetch based deployment" date="2026-01-16T17:08:12.332" >
+    <step title="Fetching changes." date="2026-01-16T17:08:12.505" /><!-- duration: 16ms -->
+    <step title="Starting LocalZipHandler" date="2026-01-16T17:08:12.536" /><!-- duration: 16ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\mqxhwsvu.zip (13.16 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-01-16T17:08:12.614" /><!-- duration: 16ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\mqxhwsvu.zip (13.16 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-01-16T17:08:12.645" >
+      <step title="Extracting 10195 entries to C:\local\Temp\zipdeploy\extracted directory" date="2026-01-16T17:08:13.020" >
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\compliance\function.json ..." date="2026-01-16T17:08:13.036" /><!-- duration: 31ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\compliance\index.js ..." date="2026-01-16T17:08:13.083" /><!-- duration: 31ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\forecast\function.json ..." date="2026-01-16T17:08:13.114" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\forecast\index.js ..." date="2026-01-16T17:08:13.145" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\node_modules\.package-lock.json ..." date="2026-01-16T17:08:13.177" /><!-- duration: 16ms -->
+        <step title="Omitting extracting file traces ..." date="2026-01-16T17:08:13.208" /><!-- duration: 16ms -->
+      </step><!-- duration: 12044ms -->
+    </step><!-- duration: 12433ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-01-16T17:08:25.094" /><!-- duration: 16ms -->
+    <step title="DeploymentManager.Deploy(id:84a26d5bfb674c65b44fbec9f1a8c4bd)" date="2026-01-16T17:08:25.141" >
+      <step title="Collecting changeset information" date="2026-01-16T17:08:25.172" /><!-- duration: 125ms -->
+      <step title="Updating submodules" date="2026-01-16T17:08:25.313" >
+        <step title="Updating submodules." date="2026-01-16T17:08:25.469" /><!-- duration: 16ms -->
+      </step><!-- duration: 188ms -->
+      <step title="Preparing deployment for commit id &apos;84a26d5bfb&apos;." date="2026-01-16T17:08:25.672" /><!-- duration: 16ms -->
+      <step title="Determining deployment builder" date="2026-01-16T17:08:25.813" >
+        <step title="UseMSBuild16: True" date="2026-01-16T17:08:25.828" /><!-- duration: 16ms -->
+        <step title="Builder is FunctionBasicBuilder" date="2026-01-16T17:08:26.016" /><!-- duration: 16ms -->
+      </step><!-- duration: 259ms -->
+      <step title="Copying SSH keys" date="2026-01-16T17:08:26.125" /><!-- duration: 16ms -->
+      <step title="Building" date="2026-01-16T17:08:26.172" >
+        <step title="Generating deployment script." date="2026-01-16T17:08:26.328" /><!-- duration: 16ms -->
+        <step title="Generating deployment script" date="2026-01-16T17:08:26.344" >
+          <step title="Using the following command to generate deployment script: &apos;azure site deploymentscript -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --functionApp --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;&apos;." date="2026-01-16T17:08:26.422" /><!-- duration: 16ms -->
+          <step title="Executing external process" date="2026-01-16T17:08:26.453" type="process" path="starter.cmd" arguments="&quot;C:\Program Files (x86)\SiteExtensions\Kudu\2025.11.1.1\bin\node_modules\.bin\kuduscript.cmd&quot; -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --functionApp --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" >
+            <step title="Generating deployment script for function App" date="2026-01-16T17:08:26.895" /><!-- duration: 16ms -->
+            <step title="Generated deployment script files" date="2026-01-16T17:08:26.942" /><!-- duration: 16ms -->
+          </step><!-- duration: 520ms -->
+          <step title="Saved cached version of the deployment script for command -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --functionApp --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" date="2026-01-16T17:08:27.004" /><!-- duration: 16ms -->
+        </step><!-- duration: 692ms -->
+        <step title="Running deployment command..." date="2026-01-16T17:08:27.224" /><!-- duration: 15ms -->
+        <step title="Command: &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" date="2026-01-16T17:08:27.270" /><!-- duration: 16ms -->
+        <step title="Executing external process" date="2026-01-16T17:08:27.301" type="process" path="starter.cmd" arguments="&quot;C:\home\site\deployments\tools\deploy.cmd&quot;" >
+          <step title="Handling function App deployment." date="2026-01-16T17:08:27.582" /><!-- duration: 16ms -->
+          <step title="Not using funcpack because SCM_USE_FUNCPACK is not set to 1" date="2026-01-16T17:08:27.645" /><!-- duration: 16ms -->
+          <step title="Installing function extensions from nuget" date="2026-01-16T17:08:27.676" /><!-- duration: 16ms -->
+          <step title="Creating app_offline.htm" date="2026-01-16T17:08:28.411" /><!-- duration: 17ms -->
+          <step title="KuduSync.NET from: &apos;C:\local\Temp\zipdeploy\extracted&apos; to: &apos;C:\home\site\wwwroot&apos;" date="2026-01-16T17:08:28.444" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;host.json&apos;" date="2026-01-16T17:08:28.491" /><!-- duration: 15ms -->
+          <step title="Copying file: &apos;package-lock.json&apos;" date="2026-01-16T17:08:28.537" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;package.json&apos;" date="2026-01-16T17:08:28.584" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;compliance\function.json&apos;" date="2026-01-16T17:08:28.631" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;compliance\index.js&apos;" date="2026-01-16T17:08:28.678" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;forecast\function.json&apos;" date="2026-01-16T17:08:28.725" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;forecast\index.js&apos;" date="2026-01-16T17:08:28.756" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.package-lock.json&apos;" date="2026-01-16T17:08:28.803" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\is-docker&apos;" date="2026-01-16T17:08:28.850" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\is-docker.cmd&apos;" date="2026-01-16T17:08:28.897" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\is-docker.ps1&apos;" date="2026-01-16T17:08:28.944" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\mssql&apos;" date="2026-01-16T17:08:28.991" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\mssql.cmd&apos;" date="2026-01-16T17:08:29.037" /><!-- duration: 17ms -->
+          <step title="Copying file: &apos;node_modules\.bin\mssql.ps1&apos;" date="2026-01-16T17:08:29.100" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\semver&apos;" date="2026-01-16T17:08:29.131" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\semver.cmd&apos;" date="2026-01-16T17:08:29.178" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\semver.ps1&apos;" date="2026-01-16T17:08:29.225" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\uuid&apos;" date="2026-01-16T17:08:29.272" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\uuid.cmd&apos;" date="2026-01-16T17:08:29.319" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\.bin\uuid.ps1&apos;" date="2026-01-16T17:08:29.366" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\CHANGELOG.md&apos;" date="2026-01-16T17:08:29.412" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\LICENSE&apos;" date="2026-01-16T17:08:29.459" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\package.json&apos;" date="2026-01-16T17:08:29.506" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\README.md&apos;" date="2026-01-16T17:08:29.569" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\shims-public.d.ts&apos;" date="2026-01-16T17:08:29.616" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist\index.js&apos;" date="2026-01-16T17:08:29.662" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist\index.js.map&apos;" date="2026-01-16T17:08:29.694" /><!-- duration: 31ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\AbortController.js&apos;" date="2026-01-16T17:08:29.756" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\AbortController.js.map&apos;" date="2026-01-16T17:08:29.803" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\AbortSignal.js&apos;" date="2026-01-16T17:08:29.850" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\AbortSignal.js.map&apos;" date="2026-01-16T17:08:29.881" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\index.js&apos;" date="2026-01-16T17:08:29.928" /><!-- duration: 19ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\dist-esm\src\index.js.map&apos;" date="2026-01-16T17:08:29.979" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\3.1\AbortController.d.ts&apos;" date="2026-01-16T17:08:30.026" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\3.1\AbortSignal.d.ts&apos;" date="2026-01-16T17:08:30.088" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\3.1\index.d.ts&apos;" date="2026-01-16T17:08:30.135" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\AbortController.d.ts&apos;" date="2026-01-16T17:08:30.182" /><!-- duration: 15ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\AbortController.d.ts.map&apos;" date="2026-01-16T17:08:30.213" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\AbortSignal.d.ts&apos;" date="2026-01-16T17:08:30.260" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\AbortSignal.d.ts.map&apos;" date="2026-01-16T17:08:30.307" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\index.d.ts&apos;" date="2026-01-16T17:08:30.354" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\index.d.ts.map&apos;" date="2026-01-16T17:08:30.385" /><!-- duration: 31ms -->
+          <step title="Copying file: &apos;node_modules\@azure\abort-controller\types\src\tsdoc-metadata.json&apos;" date="2026-01-16T17:08:30.447" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\core-auth\LICENSE&apos;" date="2026-01-16T17:08:30.479" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\core-auth\package.json&apos;" date="2026-01-16T17:08:30.526" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\core-auth\README.md&apos;" date="2026-01-16T17:08:30.572" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\core-auth\dist\browser\azureKeyCredential.d.ts&apos;" date="2026-01-16T17:08:30.619" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;node_modules\@azure\core-auth\dist\browser\azureKeyCredential.js&apos;" date="2026-01-16T17:08:30.666" /><!-- duration: 16ms -->
+          <step title="Omitting next output lines..." date="2026-01-16T17:08:30.713" /><!-- duration: 16ms -->
+          <step title="Processed 711 files..." date="2026-01-16T17:08:49.293" /><!-- duration: 16ms -->
+          <step title="Processed 1272 files..." date="2026-01-16T17:09:09.333" /><!-- duration: 16ms -->
+          <step title="Processed 1743 files..." date="2026-01-16T17:09:29.319" /><!-- duration: 16ms -->
+          <step title="Processed 2176 files..." date="2026-01-16T17:09:49.351" /><!-- duration: 16ms -->
+          <step title="Processed 2580 files..." date="2026-01-16T17:10:09.337" /><!-- duration: 16ms -->
+          <step title="Processed 2945 files..." date="2026-01-16T17:10:29.369" /><!-- duration: 16ms -->
+          <step title="Processed 3266 files..." date="2026-01-16T17:10:49.404" /><!-- duration: 31ms -->
+          <step title="Processed 3583 files..." date="2026-01-16T17:11:09.474" /><!-- duration: 31ms -->
+          <step title="Processed 3863 files..." date="2026-01-16T17:11:29.538" /><!-- duration: 16ms -->
+          <step title="Processed 4133 files..." date="2026-01-16T17:11:49.585" /><!-- duration: 16ms -->
+          <step title="Processed 4413 files..." date="2026-01-16T17:12:09.651" /><!-- duration: 31ms -->
+        </step><!-- duration: 229946ms -->
+site\locks\deployments.lock&apos; released" date="2026-01-16T17:12:17.247" /><!-- duration: 15ms -->
+>
+        <step title="Thread was being aborted." date="2026-01-16T17:12:17.262" /><!-- duration: 47ms -->
+>
+        <step title="Deleting shutdown sentinel file" date="2026-01-16T17:12:17.309" SemaphoreCount="8" /><!-- duration: 16ms -->
+>
+        <step title="Thread was being aborted. DEPLOYMENTINFO: deploymentPath = Functions App ZipDeploy. Extract zip. Remote build. , deployer = az_cli_functions, os = windows, sku = Dynamic, language = node, siteName = trainingmanager-reporting, slotName = Production, siteHostName = trainingmanager-reporting.azurewebsites.net, deploymentStatus = Error" date="2026-01-16T17:12:17.340"         <step title="Error occurred" date="2026-01-16T17:12:17.356" type="error" text="Thread was being aborted." stackTrace="   at System.Threading.Monitor.ObjWait(Boolean exitContext, Int32 millisecondsTimeout, Object obj)
+   at System.Threading.Monitor.Wait(Object obj, Int32 millisecondsTimeout, Boolean exitContext)
+   at System.Threading.Monitor.Wait(Object obj, Int32 millisecondsTimeout)
+   at System.Threading.ManualResetEventSlim.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.SpinThenBlockingWait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.InternalWait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass12_1.&lt;PerformBackgroundDeployment&gt;b__3()
+   at Kudu.Contracts.Infrastructure.LockExtensions.TryLockOperation(IOperationLock lockObj, Action operation, String operationName, TimeSpan timeout)
+   at Kudu.Contracts.Infrastructure.LockExtensions.LockOperation(IOperationLock lockObj, Action operation, String operationName, TimeSpan timeout)
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass12_0.&lt;PerformBackgroundDeployment&gt;b__1()" /><!-- duration: 16ms -->
+        <step title="Error occurred" date="2026-01-16T17:12:17.387" type="error" text="Thread was being aborted." stackTrace="   at System.Threading.Monitor.ObjWait(Boolean exitContext, Int32 millisecondsTimeout, Object obj)
+   at System.Threading.Monitor.Wait(Object obj, Int32 millisecondsTimeout, Boolean exitContext)
+   at System.Threading.Monitor.Wait(Object obj, Int32 millisecondsTimeout)
+   at System.Threading.ManualResetEventSlim.Wait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.SpinThenBlockingWait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task.InternalWait(Int32 millisecondsTimeout, CancellationToken cancellationToken)
+   at System.Threading.Tasks.Task`1.GetResultCore(Boolean waitCompletionNotification)
+   at System.Threading.Tasks.Task`1.get_Result()
+   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, Encoding encoding, String arguments, Object[] args)
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, String arguments, Object[] args)
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, String message)"       </step><!-- duration: 231231ms -->
+/><!-- duration: 16ms -->
+    </step><!-- duration: 232715ms -->
+    <step title="Error occurred" date="2026-01-16T17:12:17.871" type="error" text="Thread was being aborted." stackTrace="   at Kudu.Core.Deployment.Generator.GeneratorSiteBuilder.Build(DeploymentContext context)
+   at Kudu.Core.Deployment.DeploymentManager.&lt;Build&gt;d__38.MoveNext()" /><!-- duration: 16ms -->
+    <step title="Deployment Failed. DEPLOYMENTINFO: deploymentPath = Functions App ZipDeploy. Extract zip. Remote build. , deployer = az_cli_functions, os = windows, sku = Dynamic, language = node, siteName = trainingmanager-reporting, slotName = Production, siteHostName = trainingmanager-reporting.azurewebsites.net, deploymentStatus = Failed" date="2026-01-16T17:12:17.918" /><!-- duration: 16ms -->
+  </step><!-- duration: 245618ms -->
+</step><!-- duration: 245899ms -->

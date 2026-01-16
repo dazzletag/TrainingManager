@@ -1,0 +1,3 @@
+<step title="Startup Request" date="2026-01-16T16:51:06.021" instance="fb76a1" url="/api/zipdeploy?isAsync=true&amp;Deployer=az_cli_functions" method="POST" type="request" pid="8140,2,8" ScmType="None" >
+  <step title="Cleanup Xml Logs" date="2026-01-16T16:51:06.070" /><!-- duration: 14ms -->
+</step><!-- duration: 78ms -->
