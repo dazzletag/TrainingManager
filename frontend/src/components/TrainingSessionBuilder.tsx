@@ -1038,14 +1038,19 @@ function TrainingSessionBuilder() {
                           <Typography variant="body1" sx={{ color: "common.black" }}>
 
                             {assignment.person.name}
+                            {isCollapsed ? ` - ${assignment.person.role}` : ""}
 
                           </Typography>
 
-                          <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                          {!isCollapsed && (
 
-                            {isCollapsed ? assignment.person.role : `${assignment.person.role} - due ${assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}` }
+                            <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
-                          </Typography>
+                              {assignment.person.role} - due {assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
+
+                            </Typography>
+
+                          )}
 
                         </Box>
 
