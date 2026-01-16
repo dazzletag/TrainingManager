@@ -152,7 +152,6 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
         allowConflicts: false,
         comment: "Set to open for Mandatory Training",
         date: shift.date,
-        departmentId: shift.departmentId,
         employeeGroupId: shift.employeeGroupId,
         employeeId: "",
         endDateTime: shift.endDateTime,
