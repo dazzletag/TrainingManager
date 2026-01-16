@@ -25,6 +25,13 @@ interface PlandayShift {
   id: string;
   startDateTime: string;
   endDateTime: string;
+  date?: string;
+  comment?: string;
+  punchClockShiftId?: string;
+  status?: string;
+  dateTimeCreated?: string;
+  dateTimeModified?: string;
+  skillIds?: string[];
   departmentId?: string;
   employeeGroupId?: string;
   positionId?: string;
@@ -144,12 +151,15 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
       const payload = stripUndefined({
         allowConflicts: false,
         comment: "Set to open for Mandatory Training",
+        date: shift.date,
         departmentId: shift.departmentId,
         employeeGroupId: shift.employeeGroupId,
         employeeId: "",
         endDateTime: shift.endDateTime,
         positionId: shift.positionId,
+        punchClockShiftId: shift.punchClockShiftId,
         shiftTypeId: shift.shiftTypeId,
+        skillIds: shift.skillIds,
         startDateTime: shift.startDateTime,
       });
       await withRetry(() =>
@@ -188,7 +198,7 @@ async function createTrainingShift(
         departmentId: trainingDepartmentId,
         startDateTime: iso(window.start),
         endDateTime: iso(window.end),
-        note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+      comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
         shiftTypeId: trainingShiftTypeId,
         shiftType: "training",
         allowConflicts: false,
