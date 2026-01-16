@@ -25,6 +25,10 @@ interface PlandayShift {
   id: string;
   startDateTime: string;
   endDateTime: string;
+  departmentId?: string;
+  employeeGroupId?: string;
+  positionId?: string;
+  shiftTypeId?: string;
 }
 
 interface PlandayAbsence {
@@ -80,6 +84,10 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 500): P
   }
 }
 
+function stripUndefined<T extends Record<string, unknown>>(payload: T) {
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+
 async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boolean> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
@@ -111,7 +119,7 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
   }
 }
 
-async function removeExistingShifts(externalId: string, window: ShiftWindow): Promise<boolean> {
+async function unassignExistingShifts(externalId: string, window: ShiftWindow): Promise<boolean> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
     return false;
@@ -132,14 +140,25 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
     if (!shifts.length) {
       return true;
     }
-    await Promise.all(
-      shifts.map((shift) =>
-        withRetry(() => plandaySchedulingClient.delete(`/shifts/${shift.id}`, { headers })),
-      ),
-    );
+    for (const shift of shifts) {
+      const payload = stripUndefined({
+        allowConflicts: false,
+        comment: "Set to open for Mandatory Training",
+        departmentId: shift.departmentId,
+        employeeGroupId: shift.employeeGroupId,
+        employeeId: "",
+        endDateTime: shift.endDateTime,
+        positionId: shift.positionId,
+        shiftTypeId: shift.shiftTypeId,
+        startDateTime: shift.startDateTime,
+      });
+      await withRetry(() =>
+        plandaySchedulingClient.put(`/shifts/${shift.id}`, payload, { headers }),
+      );
+    }
     return true;
   } catch (error) {
-    console.warn("Unable to delete existing shifts for", externalId, error);
+    console.warn("Unable to unassign existing shifts for", externalId, error);
     return false;
   }
 }
@@ -216,13 +235,13 @@ export async function assignToTrainingShift(
     };
     }
 
-    const removed = await removeExistingShifts(externalId, window);
-    if (!removed) {
+    const unassigned = await unassignExistingShifts(externalId, window);
+    if (!unassigned) {
       return {
         personId,
         day,
         moved: false,
-        reason: "Unable to remove existing shifts",
+        reason: "Unable to unassign existing shifts",
       };
     }
     await createTrainingShift(externalId, window, sessionName, sessionId, day);
