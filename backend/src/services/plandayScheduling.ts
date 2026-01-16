@@ -1,4 +1,4 @@
-import { plandayClient } from "./plandaySync";
+import { plandaySchedulingClient } from "./plandaySync";
 
 const trainingPositionId = process.env.PLANDAY_TRAINING_SHIFT_POSITION_ID;
 const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
@@ -73,7 +73,7 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
   }
 
   try {
-    const response = await plandayClient.get<{ data: PlandayAbsence[] }>("/absences", {
+    const response = await plandaySchedulingClient.get<{ data: PlandayAbsence[] }>("/absences", {
       params: {
         employeeId: externalId,
         startDateTime: iso(window.start),
@@ -95,7 +95,7 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
     return;
   }
   try {
-    const response = await plandayClient.get<{ data: PlandayShift[] }>("/shifts", {
+    const response = await plandaySchedulingClient.get<{ data: PlandayShift[] }>("/shifts", {
       params: {
         employeeId: externalId,
         startDateTime: iso(window.start),
@@ -105,7 +105,7 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
 
     const shifts = response.data?.data ?? [];
     await Promise.all(
-      shifts.map((shift) => plandayClient.delete(`/shifts/${shift.id}`)),
+      shifts.map((shift) => plandaySchedulingClient.delete(`/shifts/${shift.id}`)),
     );
   } catch (error) {
     console.warn("Unable to delete existing shifts for", externalId, error);
@@ -119,7 +119,10 @@ async function createTrainingShift(
   sessionId: string,
   day: number,
 ): Promise<void> {
-  if (!plandayClient.defaults.headers || !plandayClient.defaults.headers.Authorization) {
+  if (
+    !plandaySchedulingClient.defaults.headers ||
+    !plandaySchedulingClient.defaults.headers.Authorization
+  ) {
     return;
   }
 
@@ -127,7 +130,7 @@ async function createTrainingShift(
     throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
-  await plandayClient.post("/shifts", {
+  await plandaySchedulingClient.post("/shifts", {
     employeeId: externalId,
     positionId: trainingPositionId,
     departmentId: trainingDepartmentId,

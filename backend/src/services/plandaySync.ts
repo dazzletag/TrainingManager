@@ -3,15 +3,39 @@ import { AppDataSource } from "../db/data-source";
 import { Role } from "../entities/Role";
 import { Person } from "../entities/Person";
 
-const plandayBaseUrl = process.env.PLANDAY_API_URL ?? "https://api.planday.com";
 const plandayToken = process.env.PLANDAY_API_TOKEN;
+const plandayClientId = process.env.PLANDAY_CLIENT_ID;
+const plandayHrBaseUrl =
+  process.env.PLANDAY_HR_API_URL ??
+  process.env.PLANDAY_API_URL ??
+  "https://openapi.planday.com/hr/v1.0";
+const plandaySchedulingBaseUrl =
+  process.env.PLANDAY_SCHEDULING_API_URL ?? "https://openapi.planday.com/scheduling/v1.0";
 
-const httpClient = axios.create({
-  baseURL: plandayBaseUrl,
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (plandayToken) {
+    headers.Authorization = `Bearer ${plandayToken}`;
+  }
+  if (plandayClientId) {
+    headers["X-ClientId"] = plandayClientId;
+  }
+  return headers;
+}
+
+const hrClient = axios.create({
+  baseURL: plandayHrBaseUrl,
   timeout: 15000,
-  headers: plandayToken ? { Authorization: `Bearer ${plandayToken}` } : {},
+  headers: buildHeaders(),
 });
-export { httpClient as plandayClient };
+
+const schedulingClient = axios.create({
+  baseURL: plandaySchedulingBaseUrl,
+  timeout: 15000,
+  headers: buildHeaders(),
+});
+
+export { hrClient as plandayHrClient, schedulingClient as plandaySchedulingClient };
 
 interface PlandayRole {
   id: string;
@@ -41,8 +65,8 @@ export async function syncPlandayData(): Promise<void> {
 
   try {
     const [rolesResponse, employeesResponse] = await Promise.all([
-      httpClient.get<{ data: PlandayRole[] }>("/roles"),
-      httpClient.get<{ data: PlandayEmployee[] }>("/employees"),
+      hrClient.get<{ data: PlandayRole[] }>("/roles"),
+      hrClient.get<{ data: PlandayEmployee[] }>("/employees"),
     ]);
 
     const roleRepo = AppDataSource.getRepository(Role);
