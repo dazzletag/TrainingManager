@@ -192,13 +192,13 @@ const homePalette = ["#e3f2fd", "#f3e5f5", "#e8f5e9", "#fff3e0", "#fbe9e7"];
 
 const homeColorOverrides: Record<string, string> = {
 
-  "7653": "#648133",
+  "7653": "#CFE0B4",
 
-  "7655": "#156F9F",
+  "7655": "#B7D7EA",
 
-  "7652": "#A61D5F",
+  "7652": "#E6B6CA",
 
-  "7654": "#603863",
+  "7654": "#D4C1D8",
 
 };
 
