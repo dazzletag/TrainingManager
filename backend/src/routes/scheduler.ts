@@ -371,9 +371,10 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
-    const publishResults = await Promise.all(
-      session.assignments.map((assignment) =>
-        assignToTrainingShift(
+    const publishResults = [];
+    for (const assignment of session.assignments) {
+      publishResults.push(
+        await assignToTrainingShift(
           assignment.person.id,
           assignment.person.externalId,
           session.name,
@@ -383,8 +384,9 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
           assignment.day === 1 ? session.day1StartTime : session.day2StartTime,
           assignment.day === 1 ? session.day1EndTime : session.day2EndTime,
         ),
-      ),
-    );
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
 
     res.json({
       sessionId: session.id,

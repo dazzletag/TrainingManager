@@ -67,6 +67,19 @@ function iso(dt: Date): string {
   return dt.toISOString();
 }
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 500): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 429 && retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return withRetry(fn, retries - 1, delayMs * 2);
+    }
+    throw error;
+  }
+}
+
 async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boolean> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
@@ -74,14 +87,16 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
   }
 
   try {
-    const response = await plandaySchedulingClient.get<{ data: PlandayAbsence[] }>("/absences", {
-      params: {
-        employeeId: externalId,
-        startDateTime: iso(window.start),
-        endDateTime: iso(window.end),
-      },
-      headers,
-    });
+    const response = await withRetry(() =>
+      plandaySchedulingClient.get<{ data: PlandayAbsence[] }>("/absences", {
+        params: {
+          employeeId: externalId,
+          startDateTime: iso(window.start),
+          endDateTime: iso(window.end),
+        },
+        headers,
+      }),
+    );
     const absences = response.data?.data ?? [];
     return absences.some((absence) =>
       holidayStatuses.has(absence.status?.toLowerCase() ?? ""),
@@ -98,18 +113,22 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
     return;
   }
   try {
-    const response = await plandaySchedulingClient.get<{ data: PlandayShift[] }>("/shifts", {
-      params: {
-        employeeId: externalId,
-        startDateTime: iso(window.start),
-        endDateTime: iso(window.end),
-      },
-      headers,
-    });
+    const response = await withRetry(() =>
+      plandaySchedulingClient.get<{ data: PlandayShift[] }>("/shifts", {
+        params: {
+          employeeId: externalId,
+          startDateTime: iso(window.start),
+          endDateTime: iso(window.end),
+        },
+        headers,
+      }),
+    );
 
     const shifts = response.data?.data ?? [];
     await Promise.all(
-      shifts.map((shift) => plandaySchedulingClient.delete(`/shifts/${shift.id}`, { headers })),
+      shifts.map((shift) =>
+        withRetry(() => plandaySchedulingClient.delete(`/shifts/${shift.id}`, { headers })),
+      ),
     );
   } catch (error) {
     console.warn("Unable to delete existing shifts for", externalId, error);
@@ -132,24 +151,26 @@ async function createTrainingShift(
     throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
-  await plandaySchedulingClient.post(
-    "/shifts",
-    {
-      employeeId: externalId,
-      positionId: trainingPositionId,
-      departmentId: trainingDepartmentId,
-      startDateTime: iso(window.start),
-      endDateTime: iso(window.end),
-      note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
-      shiftTypeId: trainingShiftTypeId,
-      shiftType: "training",
-      allowConflicts: false,
-      metadata: {
-        sessionId,
-        day,
+  await withRetry(() =>
+    plandaySchedulingClient.post(
+      "/shifts",
+      {
+        employeeId: externalId,
+        positionId: trainingPositionId,
+        departmentId: trainingDepartmentId,
+        startDateTime: iso(window.start),
+        endDateTime: iso(window.end),
+        note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+        shiftTypeId: trainingShiftTypeId,
+        shiftType: "training",
+        allowConflicts: false,
+        metadata: {
+          sessionId,
+          day,
+        },
       },
-    },
-    { headers },
+      { headers },
+    ),
   );
 }
 
