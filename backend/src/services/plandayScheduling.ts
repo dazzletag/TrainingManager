@@ -19,6 +19,18 @@ interface PublishResult {
   day: number;
   moved: boolean;
   reason?: string;
+  debug?: {
+    step: "unassign" | "create";
+    request: {
+      method: string;
+      url: string;
+      payload: Record<string, unknown>;
+    };
+    response?: {
+      status: number;
+      data: unknown;
+    };
+  };
 }
 
 interface PlandayShift {
@@ -126,10 +138,13 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
   }
 }
 
-async function unassignExistingShifts(externalId: string, window: ShiftWindow): Promise<boolean> {
+async function unassignExistingShifts(
+  externalId: string,
+  window: ShiftWindow,
+): Promise<{ ok: boolean; debug?: PublishResult["debug"] }> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
-    return false;
+    return { ok: false };
   }
   try {
     const response = await withRetry(() =>
@@ -145,7 +160,7 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
 
     const shifts = response.data?.data ?? [];
     if (!shifts.length) {
-      return true;
+      return { ok: true };
     }
     for (const shift of shifts) {
       const payload = stripUndefined({
@@ -157,16 +172,37 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
         endDateTime: shift.endDateTime,
         startDateTime: shift.startDateTime,
       });
+      const updateUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts/${shift.id}`;
       console.info("Planday shift update", { shiftId: shift.id, payload });
-      await withRetry(() =>
-        plandaySchedulingClient.put(`/shifts/${shift.id}`, payload, { headers }),
-      );
+      try {
+        await withRetry(() =>
+          plandaySchedulingClient.put(`/shifts/${shift.id}`, payload, { headers }),
+        );
+      } catch (error: any) {
+        return {
+          ok: false,
+          debug: {
+            step: "unassign",
+            request: {
+              method: "PUT",
+              url: updateUrl,
+              payload,
+            },
+            response: error?.response
+              ? {
+                  status: error.response.status,
+                  data: error.response.data,
+                }
+              : undefined,
+          },
+        };
+      }
       console.info("Planday shift update succeeded", { shiftId: shift.id });
     }
-    return true;
+    return { ok: true };
   } catch (error) {
     console.warn("Unable to unassign existing shifts for", externalId, error);
-    return false;
+    return { ok: false };
   }
 }
 
@@ -186,26 +222,23 @@ async function createTrainingShift(
     throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
+  const payload = {
+    employeeId: externalId,
+    positionId: trainingPositionId,
+    departmentId: trainingDepartmentId,
+    startDateTime: iso(window.start),
+    endDateTime: iso(window.end),
+    comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+    shiftTypeId: trainingShiftTypeId,
+    shiftType: "training",
+    allowConflicts: false,
+    metadata: {
+      sessionId,
+      day,
+    },
+  };
   await withRetry(() =>
-    plandaySchedulingClient.post(
-      "/shifts",
-      {
-        employeeId: externalId,
-        positionId: trainingPositionId,
-        departmentId: trainingDepartmentId,
-        startDateTime: iso(window.start),
-        endDateTime: iso(window.end),
-      comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
-        shiftTypeId: trainingShiftTypeId,
-        shiftType: "training",
-        allowConflicts: false,
-        metadata: {
-          sessionId,
-          day,
-        },
-      },
-      { headers },
-    ),
+    plandaySchedulingClient.post("/shifts", payload, { headers }),
   );
 }
 
@@ -243,15 +276,54 @@ export async function assignToTrainingShift(
     }
 
     const unassigned = await unassignExistingShifts(externalId, window);
-    if (!unassigned) {
+    if (!unassigned.ok) {
       return {
         personId,
         day,
         moved: false,
         reason: "Unable to unassign existing shifts",
+        debug: unassigned.debug,
       };
     }
-    await createTrainingShift(externalId, window, sessionName, sessionId, day);
+    try {
+      await createTrainingShift(externalId, window, sessionName, sessionId, day);
+    } catch (error: any) {
+      const createUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
+      return {
+        personId,
+        day,
+        moved: false,
+        reason: "Unable to create training shift",
+        debug: {
+          step: "create",
+          request: {
+            method: "POST",
+            url: createUrl,
+            payload: {
+              employeeId: externalId,
+              positionId: trainingPositionId,
+              departmentId: trainingDepartmentId,
+              startDateTime: iso(window.start),
+              endDateTime: iso(window.end),
+              comment: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+              shiftTypeId: trainingShiftTypeId,
+              shiftType: "training",
+              allowConflicts: false,
+              metadata: {
+                sessionId,
+                day,
+              },
+            },
+          },
+          response: error?.response
+            ? {
+                status: error.response.status,
+                data: error.response.data,
+              }
+            : undefined,
+        },
+      };
+    }
 
     return {
       personId,

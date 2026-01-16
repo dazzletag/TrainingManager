@@ -152,6 +152,30 @@ type PublishFeedback = {
 
     reason?: string;
 
+    debug?: {
+
+      step: string;
+
+      request: {
+
+        method: string;
+
+        url: string;
+
+        payload: Record<string, unknown>;
+
+      };
+
+      response?: {
+
+        status: number;
+
+        data: unknown;
+
+      };
+
+    };
+
   }[];
 
   publishedAt: string;
@@ -795,6 +819,23 @@ function TrainingSessionBuilder() {
                       <li key={`${result.personId}-${result.day}`}>
 
                         {findPersonName(result.personId)} · {result.reason ?? "reason unknown"}
+                        {result.debug && (
+                          <Box
+                            component="pre"
+                            sx={{
+                              mt: 1,
+                              mb: 0,
+                              p: 1,
+                              borderRadius: 1,
+                              bgcolor: "background.default",
+                              fontFamily: "monospace",
+                              fontSize: "0.75rem",
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            {JSON.stringify(result.debug, null, 2)}
+                          </Box>
+                        )}
 
                       </li>
 
