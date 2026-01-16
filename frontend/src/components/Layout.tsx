@@ -18,7 +18,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 import SchoolIcon from "@mui/icons-material/School";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import InsightsIcon from "@mui/icons-material/Insights";
 import { useState } from "react";
+import { useUserContext } from "../context/UserContext";
 
 const drawerWidth = 240;
 
@@ -26,11 +28,14 @@ const navigation = [
   { label: "Staff", path: "/staff", icon: <SchoolIcon /> },
   { label: "Manager", path: "/manager", icon: <AssessmentIcon /> },
   { label: "Admin", path: "/admin", icon: <AdminPanelSettingsIcon /> },
+  { label: "Reporting & Insights", path: "/admin/reporting", icon: <InsightsIcon />, adminOnly: true },
 ];
 
 function Layout() {
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { role } = useUserContext();
+  const visibleNavigation = navigation.filter((item) => !item.adminOnly || role === "admin");
 
   const drawer = (
     <div>
@@ -48,7 +53,7 @@ function Layout() {
       </Toolbar>
       <Divider />
       <List>
-        {navigation.map((item) => (
+        {visibleNavigation.map((item) => (
           <ListItemButton
             key={item.path}
             component={NavLink}

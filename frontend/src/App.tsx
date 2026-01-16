@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import StaffPage from "./pages/StaffPage";
 import ManagerPage from "./pages/ManagerPage";
 import AdminPage from "./pages/AdminPage";
+import ReportingPage from "./pages/ReportingPage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="staff" element={<StaffPage />} />
           <Route path="manager" element={<ManagerPage />} />
           <Route path="admin" element={<AdminPage />} />
+          <Route path="admin/reporting" element={<ReportingPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

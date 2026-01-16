@@ -1,0 +1,15 @@
+{
+  "name": "trainingmanager-reporting",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "mssql": "^10.0.4"
+  }
+}
