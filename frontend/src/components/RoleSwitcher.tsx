@@ -15,7 +15,6 @@ export function RoleSwitcher() {
     <Stack direction="row" spacing={1} alignItems="center">
       <TextField
         select
-        label="Role"
         size="small"
         value={role}
         onChange={(event) => setRole(event.target.value as typeof role)}
@@ -28,13 +27,11 @@ export function RoleSwitcher() {
         ))}
       </TextField>
       <TextField
-        label="Staff External ID"
         size="small"
         value={personExternalId}
         onChange={(event) => setPersonExternalId(event.target.value)}
       />
       <TextField
-        label="User Email"
         size="small"
         value={userEmail}
         onChange={(event) => setUserEmail(event.target.value)}
