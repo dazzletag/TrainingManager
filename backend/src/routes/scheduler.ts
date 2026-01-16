@@ -17,7 +17,16 @@ const excludedNames = new Set(["rich crocker", "linda warren"]);
 
 function isExcludedPerson(person: Person) {
   const name = person.fullName?.toLowerCase() ?? "";
-  return name.includes("agency") || excludedNames.has(name);
+  const status = person.employmentStatus?.toLowerCase() ?? "";
+  const flagged = person as Person & { hasResigned?: boolean; parentalLeave?: boolean };
+  return (
+    name.includes("agency") ||
+    excludedNames.has(name) ||
+    flagged.hasResigned === true ||
+    flagged.parentalLeave === true ||
+    status.includes("resign") ||
+    status.includes("parental")
+  );
 }
 
 function resolveRequirementMeta(
