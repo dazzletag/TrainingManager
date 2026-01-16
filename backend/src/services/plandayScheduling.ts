@@ -159,9 +159,8 @@ async function unassignExistingShifts(
   const lookupUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
   const lookupParams = {
     employeeId: externalId,
-    date: windowDate,
-    startDateTime: iso(window.start),
-    endDateTime: iso(window.end),
+    from: windowDate,
+    to: windowDate,
   };
   try {
     const response = await withRetry(() =>
