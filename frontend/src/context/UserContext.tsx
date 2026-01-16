@@ -19,7 +19,7 @@ const placeholderExternalId = "planday-employee-001";
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("staff");
+  const [role, setRole] = useState<Role>("admin");
   const [personExternalId, setPersonExternalId] = useState(defaultExternalId);
   const [userEmail, setUserEmail] = useState("demo.user@trainingmanager.local");
 
