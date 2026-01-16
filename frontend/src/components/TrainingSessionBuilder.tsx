@@ -236,6 +236,7 @@ function TrainingSessionBuilder() {
 
   const [publishFeedback, setPublishFeedback] = useState<PublishFeedback | null>(null);
   const [recommendFeedback, setRecommendFeedback] = useState<{ count: number; at: string } | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
 
 
@@ -254,6 +255,24 @@ function TrainingSessionBuilder() {
   const unassigned: UnassignedPerson[] = overviewQuery.data?.unassigned ?? [];
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null;
+
+  const attendeeCount = useMemo(() => {
+
+    if (!selectedSession) return 0;
+
+    const ids = new Set(
+
+      [...selectedSession.day1Assignments, ...selectedSession.day2Assignments].map(
+
+        (assignment) => assignment.person.id,
+
+      ),
+
+    );
+
+    return ids.size;
+
+  }, [selectedSession]);
 
 
 
@@ -761,7 +780,7 @@ function TrainingSessionBuilder() {
 
           <Stack direction="row" alignItems="center" justifyContent="space-between">
 
-            <Typography variant="h6">Session {selectedSession.name}</Typography>
+            <Typography variant="h6">Session {selectedSession.name} ({attendeeCount})</Typography>
 
             <Stack direction="row" spacing={1}>
 
@@ -790,6 +809,18 @@ function TrainingSessionBuilder() {
               >
 
                 Recommend
+
+              </Button>
+
+              <Button
+
+                variant="outlined"
+
+                onClick={() => setIsCollapsed((prev) => !prev)}
+
+              >
+
+                {isCollapsed ? "Expand" : "Collapse"}
 
               </Button>
 
@@ -990,7 +1021,7 @@ function TrainingSessionBuilder() {
 
                           px: 2,
 
-                          py: 1,
+                          py: isCollapsed ? 0.6 : 1,
 
                           borderRight: "7px solid #0078D7",
 
@@ -1012,21 +1043,25 @@ function TrainingSessionBuilder() {
 
                           <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
-                            {assignment.person.role} - due {assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
+                            {isCollapsed ? assignment.person.role : `${assignment.person.role} - due ${assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}` }
 
                           </Typography>
 
                         </Box>
 
-                        <Chip
+                        {!isCollapsed && (
 
-                          label={assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
+                          <Chip
 
-                          size="small"
+                            label={assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
 
-                          sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                            size="small"
 
-                        />
+                            sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+
+                          />
+
+                        )}
 
                       </Paper>
 
@@ -1098,7 +1133,7 @@ function TrainingSessionBuilder() {
 
                     px: 2,
 
-                    py: 1,
+                    py: isCollapsed ? 0.6 : 1,
 
                     borderRight: "7px solid #0078D7",
 
