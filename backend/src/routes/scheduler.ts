@@ -268,6 +268,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         if (!person || isExcludedPerson(person)) {
           return null;
         }
+        const trainingDates = getTrainingDates(assignmentMap.get(person.id)?.evidence ?? []);
         return {
           id: assignment.id,
           dropZoneId: assignment.dropZoneId,
@@ -284,6 +285,8 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
               assignmentMap.get(person.id),
               metaByRoleId,
             ).status,
+            nextDue: trainingDates.nextDue?.toISOString(),
+            lastTrainingAt: trainingDates.lastTrainingAt?.toISOString(),
           },
         };
       });
@@ -295,6 +298,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         if (!person || isExcludedPerson(person)) {
           return null;
         }
+        const trainingDates = getTrainingDates(assignmentMap.get(person.id)?.evidence ?? []);
         return {
           id: assignment.id,
           dropZoneId: assignment.dropZoneId,
@@ -311,6 +315,8 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
               assignmentMap.get(person.id),
               metaByRoleId,
             ).status,
+            nextDue: trainingDates.nextDue?.toISOString(),
+            lastTrainingAt: trainingDates.lastTrainingAt?.toISOString(),
           },
         };
       });

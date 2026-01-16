@@ -82,6 +82,8 @@ type SessionAssignment = {
     primaryDepartmentId?: string;
 
     status: string;
+    nextDue?: string;
+    lastTrainingAt?: string;
 
   };
 
@@ -1010,7 +1012,7 @@ function TrainingSessionBuilder() {
 
                           <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
 
-                            {assignment.person.role} � {assignment.person.status}
+                            {assignment.person.role} - due {assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
 
                           </Typography>
 
@@ -1018,7 +1020,7 @@ function TrainingSessionBuilder() {
 
                         <Chip
 
-                          label={assignment.person.status}
+                          label={assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
 
                           size="small"
 
@@ -1128,7 +1130,7 @@ function TrainingSessionBuilder() {
 
                     <Chip
 
-                      label={person.status}
+                      label={person.nextDue ? formatDate(person.nextDue) : "no date"}
 
                       size="small"
 
