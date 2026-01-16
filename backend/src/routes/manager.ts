@@ -3,6 +3,7 @@ import { AppDataSource } from "../db/data-source";
 import { Person } from "../entities/Person";
 import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
+import { Assignment } from "../entities/Assignment";
 import { evaluateRequirement } from "../services/complianceService";
 import { In } from "typeorm";
 
@@ -66,6 +67,99 @@ function mergeGroupRequirementMeta(
 }
 
 router.get("/compliance", async (req, res) => {
+  const requirementName = (req.query.requirementName as string | undefined)?.trim();
+  if (requirementName) {
+    const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+    const assignmentRepo = AppDataSource.getRepository(Assignment);
+    const requirementGroupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
+    const personRepo = AppDataSource.getRepository(Person);
+
+    const requirement = await requirementRepo.findOne({ where: { name: requirementName } });
+    if (!requirement) {
+      return res.json({ buckets: [] });
+    }
+
+    const assignments = await assignmentRepo.find({
+      where: { requirement: { id: requirement.id } },
+      relations: { evidence: true, person: true },
+    });
+    const personIds = Array.from(new Set(assignments.map((assignment) => assignment.person.id)));
+    const people = personIds.length
+      ? await personRepo.find({
+          where: { id: In(personIds) },
+          relations: { role: true, groups: true },
+        })
+      : [];
+
+    const groupIds = Array.from(
+      new Set(people.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
+    );
+    const groupLinks = groupIds.length
+      ? await requirementGroupRepo.find({
+          where: { requirementId: requirement.id, roleId: In(groupIds) },
+        })
+      : [];
+    const metaByRoleId = new Map(
+      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+    );
+
+    const assignmentMap = new Map(assignments.map((assignment) => [assignment.person.id, assignment]));
+    const summaries: Record<string, any> = {};
+
+    for (const person of people) {
+      const groupIdsForPerson = person.groups?.map((group) => group.id) ?? [];
+      let merged: { requiredLevel: number; mandatory: boolean } | undefined;
+      for (const groupId of groupIdsForPerson) {
+        const meta = metaByRoleId.get(groupId);
+        if (!meta) continue;
+        if (!merged) {
+          merged = { ...meta };
+        } else {
+          merged = {
+            requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
+            mandatory: merged.mandatory || meta.mandatory,
+          };
+        }
+      }
+      const resolvedRequirement = merged
+        ? Object.assign({}, requirement, {
+            requiredLevel: merged.requiredLevel,
+            mandatory: merged.mandatory,
+          })
+        : requirement;
+      const result = evaluateRequirement(resolvedRequirement, assignmentMap.get(person.id));
+
+      const bucketKey = `${person.homeLocation}|${person.role.name}`;
+      if (!summaries[bucketKey]) {
+        summaries[bucketKey] = {
+          homeLocation: person.homeLocation,
+          role: person.role.name,
+          totalPeople: 0,
+          totalRequirements: 0,
+          totalComplianceRate: 0,
+          atRiskPeople: 0,
+          missingPeople: 0,
+        };
+      }
+
+      const bucket = summaries[bucketKey];
+      bucket.totalPeople += 1;
+      bucket.totalRequirements += 1;
+      bucket.totalComplianceRate += result.status === "compliant" ? 100 : 0;
+      if (result.status === "at-risk") bucket.atRiskPeople += 1;
+      if (result.status === "missing") bucket.missingPeople += 1;
+    }
+
+    const buckets = Object.values(summaries).map((bucket) => ({
+      ...bucket,
+      complianceRate: bucket.totalPeople
+        ? Math.round(bucket.totalComplianceRate / bucket.totalPeople)
+        : 0,
+    }));
+
+    return res.json({ buckets });
+  }
+
   const personRepo = AppDataSource.getRepository(Person);
   const people = await personRepo.find({
     relations: {
@@ -136,6 +230,84 @@ router.get("/compliance", async (req, res) => {
 });
 
 router.get("/at-risk", async (req, res) => {
+  const requirementName = (req.query.requirementName as string | undefined)?.trim();
+  if (requirementName) {
+    const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+    const assignmentRepo = AppDataSource.getRepository(Assignment);
+    const requirementGroupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
+    const personRepo = AppDataSource.getRepository(Person);
+
+    const requirement = await requirementRepo.findOne({ where: { name: requirementName } });
+    if (!requirement) {
+      return res.json({ atRisk: [] });
+    }
+
+    const assignments = await assignmentRepo.find({
+      where: { requirement: { id: requirement.id } },
+      relations: { evidence: true, person: true },
+    });
+    const personIds = Array.from(new Set(assignments.map((assignment) => assignment.person.id)));
+    const people = personIds.length
+      ? await personRepo.find({
+          where: { id: In(personIds) },
+          relations: { role: true, groups: true },
+        })
+      : [];
+
+    const groupIds = Array.from(
+      new Set(people.flatMap((person) => person.groups?.map((group) => group.id) ?? [])),
+    );
+    const groupLinks = groupIds.length
+      ? await requirementGroupRepo.find({
+          where: { requirementId: requirement.id, roleId: In(groupIds) },
+        })
+      : [];
+    const metaByRoleId = new Map(
+      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+    );
+
+    const assignmentMap = new Map(assignments.map((assignment) => [assignment.person.id, assignment]));
+    const atRisk: any[] = [];
+
+    for (const person of people) {
+      const groupIdsForPerson = person.groups?.map((group) => group.id) ?? [];
+      let merged: { requiredLevel: number; mandatory: boolean } | undefined;
+      for (const groupId of groupIdsForPerson) {
+        const meta = metaByRoleId.get(groupId);
+        if (!meta) continue;
+        if (!merged) {
+          merged = { ...meta };
+        } else {
+          merged = {
+            requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
+            mandatory: merged.mandatory || meta.mandatory,
+          };
+        }
+      }
+      const resolvedRequirement = merged
+        ? Object.assign({}, requirement, {
+            requiredLevel: merged.requiredLevel,
+            mandatory: merged.mandatory,
+          })
+        : requirement;
+      const result = evaluateRequirement(resolvedRequirement, assignmentMap.get(person.id));
+
+      if (result.status !== "compliant") {
+        atRisk.push({
+          person: {
+            id: person.id,
+            name: person.fullName,
+            role: person.role.name,
+            homeLocation: person.homeLocation,
+          },
+          requirements: [result],
+        });
+      }
+    }
+
+    return res.json({ atRisk });
+  }
+
   const personRepo = AppDataSource.getRepository(Person);
   const people = await personRepo.find({
     relations: {

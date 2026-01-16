@@ -46,15 +46,17 @@ export function submitEvidence(personId: string, payload: any, role: string, ema
   });
 }
 
-export function fetchManagerCompliance(role: string, email: string) {
+export function fetchManagerCompliance(role: string, email: string, requirementName?: string) {
   return apiClient.get("/manager/compliance", {
     headers: withHeaders(role, email),
+    params: requirementName ? { requirementName } : undefined,
   });
 }
 
-export function fetchManagerAtRisk(role: string, email: string) {
+export function fetchManagerAtRisk(role: string, email: string, requirementName?: string) {
   return apiClient.get("/manager/at-risk", {
     headers: withHeaders(role, email),
+    params: requirementName ? { requirementName } : undefined,
   });
 }
 

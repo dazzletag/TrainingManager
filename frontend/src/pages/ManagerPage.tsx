@@ -30,12 +30,12 @@ function ManagerPage() {
 
   const complianceQuery = useQuery({
     queryKey: ["managerCompliance", role],
-    queryFn: () => fetchManagerCompliance(role, userEmail).then((response) => response.data),
+    queryFn: () => fetchManagerCompliance(role, userEmail, "Mandatory Training").then((response) => response.data),
   });
 
   const atRiskQuery = useQuery({
     queryKey: ["managerAtRisk", role],
-    queryFn: () => fetchManagerAtRisk(role, userEmail).then((response) => response.data),
+    queryFn: () => fetchManagerAtRisk(role, userEmail, "Mandatory Training").then((response) => response.data),
   });
 
   return (
