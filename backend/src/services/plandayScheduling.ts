@@ -157,9 +157,11 @@ async function unassignExistingShifts(externalId: string, window: ShiftWindow): 
         endDateTime: shift.endDateTime,
         startDateTime: shift.startDateTime,
       });
+      console.info("Planday shift update", { shiftId: shift.id, payload });
       await withRetry(() =>
         plandaySchedulingClient.put(`/shifts/${shift.id}`, payload, { headers }),
       );
+      console.info("Planday shift update succeeded", { shiftId: shift.id });
     }
     return true;
   } catch (error) {
