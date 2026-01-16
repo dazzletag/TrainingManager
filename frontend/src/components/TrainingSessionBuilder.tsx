@@ -36,6 +36,8 @@ import {
 
   publishTrainingSession,
 
+  deleteTrainingSession,
+
   removeSessionAssignment,
 
 } from "../services/api";
@@ -97,9 +99,13 @@ type SessionOverview = {
 
   day2: string;
 
-  startTime?: string;
+  day1StartTime?: string;
 
-  endTime?: string;
+  day1EndTime?: string;
+
+  day2StartTime?: string;
+
+  day2EndTime?: string;
 
   day1Assignments: SessionAssignment[];
 
@@ -190,9 +196,13 @@ function TrainingSessionBuilder() {
 
     day2: "",
 
-    startTime: "09:15",
+    day1StartTime: "09:15",
 
-    endTime: "15:45",
+    day1EndTime: "15:45",
+
+    day2StartTime: "09:15",
+
+    day2EndTime: "15:45",
 
   });
 
@@ -254,7 +264,7 @@ function TrainingSessionBuilder() {
 
   const createSessionMutation = useMutation({
 
-    mutationFn: (payload: { name: string; type: string; day1: string; day2: string; startTime: string; endTime: string }) =>
+    mutationFn: (payload: { name: string; type: string; day1: string; day2: string; day1StartTime: string; day1EndTime: string; day2StartTime: string; day2EndTime: string }) =>
 
       createTrainingSession(payload, role, userEmail),
 
@@ -264,7 +274,7 @@ function TrainingSessionBuilder() {
 
       setSelectedSessionId(response.data.session.id);
 
-      setForm({ name: "", type: "Mandatory Training", day1: "", day2: "", startTime: "09:15", endTime: "15:45" });
+      setForm({ name: "", type: "Mandatory Training", day1: "", day2: "", day1StartTime: "09:15", day1EndTime: "15:45", day2StartTime: "09:15", day2EndTime: "15:45" });
 
     },
 
@@ -287,6 +297,20 @@ function TrainingSessionBuilder() {
         publishedAt: response.data.publishedAt,
 
       });
+
+    },
+
+  });
+
+  const deleteSessionMutation = useMutation({
+
+    mutationFn: (sessionId: string) => deleteTrainingSession(sessionId, role, userEmail),
+
+    onSuccess: () => {
+
+      queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
+
+      setSelectedSessionId(null);
 
     },
 
@@ -472,7 +496,7 @@ function TrainingSessionBuilder() {
 
         </Typography>
 
-        <Stack component="form" spacing={2} mt={2} direction={{ xs: "column", md: "row" }}>
+        <Stack component="form" spacing={2} mt={2}>
 
           <TextField
 
@@ -498,75 +522,121 @@ function TrainingSessionBuilder() {
 
             onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
 
-          />
-
-          <TextField
-
-            label="Day 1"
-
-            type="date"
-
-            size="small"
-
-            value={form.day1}
-
-            onChange={(event) => setForm((prev) => ({ ...prev, day1: event.target.value }))}
-
-            InputLabelProps={{ shrink: true }}
+            fullWidth
 
           />
 
-          <TextField
+          <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
 
-            label="Day 2"
+            <TextField
 
-            type="date"
+              label="Day 1"
 
-            size="small"
+              type="date"
 
-            value={form.day2}
+              size="small"
 
-            onChange={(event) => setForm((prev) => ({ ...prev, day2: event.target.value }))}
+              value={form.day1}
 
-            InputLabelProps={{ shrink: true }}
+              onChange={(event) => setForm((prev) => ({ ...prev, day1: event.target.value }))}
 
-          />
+              InputLabelProps={{ shrink: true }}
 
-          <TextField
+            />
 
-            label="Start time"
+            <TextField
 
-            type="time"
+              label="Day 1 start"
 
-            size="small"
+              type="time"
 
-            value={form.startTime}
+              size="small"
 
-            onChange={(event) => setForm((prev) => ({ ...prev, startTime: event.target.value }))}
+              value={form.day1StartTime}
 
-            InputLabelProps={{ shrink: true }}
+              onChange={(event) => setForm((prev) => ({ ...prev, day1StartTime: event.target.value }))}
 
-            inputProps={{ step: 300 }}
+              InputLabelProps={{ shrink: true }}
 
-          />
+              inputProps={{ step: 300 }}
 
-          <TextField
+            />
 
-            label="End time"
+            <TextField
 
-            type="time"
+              label="Day 1 end"
 
-            size="small"
+              type="time"
 
-            value={form.endTime}
+              size="small"
 
-            onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
+              value={form.day1EndTime}
 
-            InputLabelProps={{ shrink: true }}
+              onChange={(event) => setForm((prev) => ({ ...prev, day1EndTime: event.target.value }))}
 
-            inputProps={{ step: 300 }}
+              InputLabelProps={{ shrink: true }}
 
-          />
+              inputProps={{ step: 300 }}
+
+            />
+
+          </Stack>
+
+          <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
+
+            <TextField
+
+              label="Day 2"
+
+              type="date"
+
+              size="small"
+
+              value={form.day2}
+
+              onChange={(event) => setForm((prev) => ({ ...prev, day2: event.target.value }))}
+
+              InputLabelProps={{ shrink: true }}
+
+            />
+
+            <TextField
+
+              label="Day 2 start"
+
+              type="time"
+
+              size="small"
+
+              value={form.day2StartTime}
+
+              onChange={(event) => setForm((prev) => ({ ...prev, day2StartTime: event.target.value }))}
+
+              InputLabelProps={{ shrink: true }}
+
+              inputProps={{ step: 300 }}
+
+            />
+
+            <TextField
+
+              label="Day 2 end"
+
+              type="time"
+
+              size="small"
+
+              value={form.day2EndTime}
+
+              onChange={(event) => setForm((prev) => ({ ...prev, day2EndTime: event.target.value }))}
+
+              InputLabelProps={{ shrink: true }}
+
+              inputProps={{ step: 300 }}
+
+            />
+
+          </Stack>
 
           <Button
 
@@ -574,7 +644,7 @@ function TrainingSessionBuilder() {
 
             onClick={() => createSessionMutation.mutate(form)}
 
-            disabled={!form.name || !form.day1 || !form.day2 || !form.startTime || !form.endTime || createSessionMutation.isPending}
+            disabled={!form.name || !form.day1 || !form.day2 || !form.day1StartTime || !form.day1EndTime || !form.day2StartTime || !form.day2EndTime || createSessionMutation.isPending}
 
           >
 
@@ -648,19 +718,45 @@ function TrainingSessionBuilder() {
 
             <Typography variant="h6">Session {selectedSession.name}</Typography>
 
-            <Button
+            <Stack direction="row" spacing={1}>
 
-              variant="contained"
+              <Button
 
-              disabled={publishMutation.isPending}
+                variant="contained"
 
-              onClick={() => publishMutation.mutate(selectedSession.id)}
+                disabled={publishMutation.isPending}
 
-            >
+                onClick={() => publishMutation.mutate(selectedSession.id)}
 
-              Publish to Planday
+              >
 
-            </Button>
+                Publish to Planday
+
+              </Button>
+
+              <Button
+
+                variant="outlined"
+
+                color="error"
+
+                disabled={deleteSessionMutation.isPending}
+
+                onClick={() => {
+
+                  if (!window.confirm(`Delete session ${selectedSession.name}?`)) return;
+
+                  deleteSessionMutation.mutate(selectedSession.id);
+
+                }}
+
+              >
+
+                Delete session
+
+              </Button>
+
+            </Stack>
 
           </Stack>
 

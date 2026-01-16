@@ -121,8 +121,10 @@ async function seed(): Promise<void> {
         name: "Mandatory Care Refresh",
         day1: new Date(),
         day2: new Date(Date.now() + 1000 * 60 * 60 * 24),
-        startTime: "09:15",
-        endTime: "15:45",
+        day1StartTime: "09:15",
+        day1EndTime: "15:45",
+        day2StartTime: "09:15",
+        day2EndTime: "15:45",
         type: "Mandatory Training",
       }),
     );

@@ -16,10 +16,16 @@ export class TrainingSession {
   day2!: Date;
 
   @Column({ type: "varchar", length: 5, default: "09:15" })
-  startTime!: string;
+  day1StartTime!: string;
 
   @Column({ type: "varchar", length: 5, default: "15:45" })
-  endTime!: string;
+  day1EndTime!: string;
+
+  @Column({ type: "varchar", length: 5, default: "09:15" })
+  day2StartTime!: string;
+
+  @Column({ type: "varchar", length: 5, default: "15:45" })
+  day2EndTime!: string;
 
   @Column({ default: "Mandatory Training" })
   type!: string;

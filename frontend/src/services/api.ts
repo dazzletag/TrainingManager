@@ -139,3 +139,9 @@ export function publishTrainingSession(sessionId: string, role: string, email: s
     },
   );
 }
+
+export function deleteTrainingSession(sessionId: string, role: string, email: string) {
+  return apiClient.delete(`/scheduler/sessions/${sessionId}`, {
+    headers: withHeaders(role, email),
+  });
+}

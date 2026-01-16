@@ -112,8 +112,10 @@ paths:
                 - name
                 - day1
                 - day2
-                - startTime
-                - endTime
+                - day1StartTime
+                - day1EndTime
+                - day2StartTime
+                - day2EndTime
               properties:
                 name:
                   type: string
@@ -123,10 +125,16 @@ paths:
                 day2:
                   type: string
                   format: date
-                startTime:
+                day1StartTime:
                   type: string
                   example: "09:15"
-                endTime:
+                day1EndTime:
+                  type: string
+                  example: "15:45"
+                day2StartTime:
+                  type: string
+                  example: "09:15"
+                day2EndTime:
                   type: string
                   example: "15:45"
                 type:
@@ -134,6 +142,18 @@ paths:
       responses:
         "201":
           description: Session created
+  /scheduler/sessions/{sessionId}:
+    delete:
+      summary: Delete a training session and its assignments
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Session deleted
   /scheduler/assign:
     post:
       summary: Assign or move a person into a session day drop zone

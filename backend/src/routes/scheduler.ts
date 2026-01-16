@@ -203,8 +203,10 @@ router.get("/overview", async (_req, res) => {
       type: session.type,
       day1: toIsoString(session.day1),
       day2: toIsoString(session.day2),
-      startTime: session.startTime,
-      endTime: session.endTime,
+      day1StartTime: session.day1StartTime,
+      day1EndTime: session.day1EndTime,
+      day2StartTime: session.day2StartTime,
+      day2EndTime: session.day2EndTime,
       day1Assignments,
       day2Assignments,
     };
@@ -252,12 +254,12 @@ router.get("/overview", async (_req, res) => {
 });
 
 router.post("/sessions", async (req, res) => {
-  const { name, day1, day2, type, startTime, endTime } = req.body;
+  const { name, day1, day2, type, day1StartTime, day1EndTime, day2StartTime, day2EndTime } = req.body;
 
-  if (!name || !day1 || !day2 || !startTime || !endTime) {
-    return res
-      .status(400)
-      .json({ message: "Name, Day1, Day2, startTime and endTime are required" });
+  if (!name || !day1 || !day2 || !day1StartTime || !day1EndTime || !day2StartTime || !day2EndTime) {
+    return res.status(400).json({
+      message: "Name, Day1, Day2, day1StartTime, day1EndTime, day2StartTime and day2EndTime are required",
+    });
   }
 
   const repo = AppDataSource.getRepository(TrainingSession);
@@ -265,8 +267,10 @@ router.post("/sessions", async (req, res) => {
     name,
     day1: new Date(day1),
     day2: new Date(day2),
-    startTime,
-    endTime,
+    day1StartTime,
+    day1EndTime,
+    day2StartTime,
+    day2EndTime,
     type: type ?? "Mandatory Training",
   });
 
@@ -338,6 +342,17 @@ router.post("/assign/remove", async (req, res) => {
   res.status(204).send();
 });
 
+router.delete("/sessions/:sessionId", async (req, res) => {
+  const { sessionId } = req.params;
+  if (!sessionId) {
+    return res.status(400).json({ message: "sessionId is required" });
+  }
+
+  const sessionRepo = AppDataSource.getRepository(TrainingSession);
+  await sessionRepo.delete({ id: sessionId });
+  res.status(204).send();
+});
+
 router.post("/sessions/:sessionId/publish", async (req, res) => {
   const { sessionId } = req.params;
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
@@ -365,8 +380,8 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
           session.id,
           assignment.day,
           assignment.day === 1 ? session.day1 : session.day2,
-          session.startTime,
-          session.endTime,
+          assignment.day === 1 ? session.day1StartTime : session.day2StartTime,
+          assignment.day === 1 ? session.day1EndTime : session.day2EndTime,
         ),
       ),
     );

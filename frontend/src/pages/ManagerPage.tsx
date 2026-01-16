@@ -43,7 +43,7 @@ function ManagerPage() {
 
   return (
     <Stack spacing={3}>
-            <Accordion defaultExpanded>
+            <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="h6">Compliance Overview</Typography>
         </AccordionSummary>
@@ -83,7 +83,7 @@ function ManagerPage() {
         </AccordionDetails>
       </Accordion>
 
-      <Accordion defaultExpanded>
+      <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="h6">At-Risk Staff</Typography>
         </AccordionSummary>
