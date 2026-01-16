@@ -488,7 +488,8 @@ router.post("/sessions/:sessionId/recommend", async (req, res) => {
   const existingPersonIds = new Set(session.assignments.map((assignment) => assignment.person.id));
   const recommendedPeople = recommended
     .map((employee) => unassignedByExternalId.get(employee.employee_number))
-    .filter((person) => person && !existingPersonIds.has(person.id));
+    .filter((person) => person && !existingPersonIds.has(person.id))
+    .slice(0, 16);
   const recommendedIds = recommendedPeople.map((person) => person.id);
 
   const people = recommendedIds.length
