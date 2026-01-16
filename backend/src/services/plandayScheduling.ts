@@ -1,6 +1,5 @@
 import { getPlandayHeaders, plandaySchedulingClient } from "./plandaySync";
 
-const trainingPositionId = process.env.PLANDAY_TRAINING_SHIFT_POSITION_ID;
 const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
 const trainingShiftStartHour = Number(process.env.PLANDAY_TRAINING_SHIFT_START_HOUR ?? 9);
 const trainingShiftEndHour = Number(process.env.PLANDAY_TRAINING_SHIFT_END_HOUR ?? 17);
@@ -263,14 +262,11 @@ async function createTrainingShift(
   sessionId: string,
   day: number,
   employeeGroupId?: string,
+  positionId?: string,
 ): Promise<void> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
     return;
-  }
-
-  if (!trainingPositionId) {
-    throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
   const payload = stripUndefined({
@@ -283,7 +279,7 @@ async function createTrainingShift(
     endTime: formatTimeLocal(window.end),
     useBreaks: true,
     employeeGroupId,
-    positionId: trainingPositionId,
+    positionId,
     employeeId: externalId,
   });
   await withRetry(() =>
@@ -307,6 +303,21 @@ function resolveEmployeeGroupId(
       return "21753";
     default:
       return "20395";
+  }
+}
+
+function resolveTrainingPositionId(home?: string): string | undefined {
+  switch ((home ?? "").trim()) {
+    case "Quarry House":
+      return "20843";
+    case "Beech House":
+      return "20842";
+    case "Field House":
+      return "20845";
+    case "Glebe House":
+      return "20728";
+    default:
+      return undefined;
   }
 }
 
@@ -358,6 +369,7 @@ export async function assignToTrainingShift(
       unassigned.employeeGroupId,
       home,
     );
+    const resolvedPositionId = resolveTrainingPositionId(home);
     if (!resolvedEmployeeGroupId) {
       return {
         personId,
@@ -374,6 +386,7 @@ export async function assignToTrainingShift(
         sessionId,
         day,
         resolvedEmployeeGroupId,
+        resolvedPositionId,
       );
     } catch (error: any) {
       const createUrl = `${plandaySchedulingClient.defaults.baseURL ?? ""}/shifts`;
@@ -387,7 +400,7 @@ export async function assignToTrainingShift(
           request: {
             method: "POST",
             url: createUrl,
-            payload: {
+            payload: stripUndefined({
               allowConflicts: false,
               date: formatDateLocal(window.start),
               comment: "mandatory training",
@@ -397,9 +410,9 @@ export async function assignToTrainingShift(
               endTime: formatTimeLocal(window.end),
               useBreaks: true,
               employeeGroupId: resolvedEmployeeGroupId,
-              positionId: trainingPositionId,
+              positionId: resolvedPositionId,
               employeeId: externalId,
-            },
+            }),
           },
           response: error?.response
             ? {
