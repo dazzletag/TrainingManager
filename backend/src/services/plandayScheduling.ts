@@ -1,4 +1,4 @@
-import { plandaySchedulingClient } from "./plandaySync";
+import { getPlandayHeaders, plandaySchedulingClient } from "./plandaySync";
 
 const trainingPositionId = process.env.PLANDAY_TRAINING_SHIFT_POSITION_ID;
 const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
@@ -68,7 +68,8 @@ function iso(dt: Date): string {
 }
 
 async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boolean> {
-  if (!process.env.PLANDAY_API_TOKEN) {
+  const headers = await getPlandayHeaders();
+  if (!headers.Authorization) {
     return false;
   }
 
@@ -79,6 +80,7 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
         startDateTime: iso(window.start),
         endDateTime: iso(window.end),
       },
+      headers,
     });
     const absences = response.data?.data ?? [];
     return absences.some((absence) =>
@@ -91,7 +93,8 @@ async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boo
 }
 
 async function removeExistingShifts(externalId: string, window: ShiftWindow): Promise<void> {
-  if (!process.env.PLANDAY_API_TOKEN) {
+  const headers = await getPlandayHeaders();
+  if (!headers.Authorization) {
     return;
   }
   try {
@@ -101,11 +104,12 @@ async function removeExistingShifts(externalId: string, window: ShiftWindow): Pr
         startDateTime: iso(window.start),
         endDateTime: iso(window.end),
       },
+      headers,
     });
 
     const shifts = response.data?.data ?? [];
     await Promise.all(
-      shifts.map((shift) => plandaySchedulingClient.delete(`/shifts/${shift.id}`)),
+      shifts.map((shift) => plandaySchedulingClient.delete(`/shifts/${shift.id}`, { headers })),
     );
   } catch (error) {
     console.warn("Unable to delete existing shifts for", externalId, error);
@@ -119,10 +123,8 @@ async function createTrainingShift(
   sessionId: string,
   day: number,
 ): Promise<void> {
-  if (
-    !plandaySchedulingClient.defaults.headers ||
-    !plandaySchedulingClient.defaults.headers.Authorization
-  ) {
+  const headers = await getPlandayHeaders();
+  if (!headers.Authorization) {
     return;
   }
 
@@ -130,21 +132,25 @@ async function createTrainingShift(
     throw new Error("PLANDAY_TRAINING_SHIFT_POSITION_ID is not configured");
   }
 
-  await plandaySchedulingClient.post("/shifts", {
-    employeeId: externalId,
-    positionId: trainingPositionId,
-    departmentId: trainingDepartmentId,
-    startDateTime: iso(window.start),
-    endDateTime: iso(window.end),
-    note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
-    shiftTypeId: trainingShiftTypeId,
-    shiftType: "training",
-    allowConflicts: false,
-    metadata: {
-      sessionId,
-      day,
+  await plandaySchedulingClient.post(
+    "/shifts",
+    {
+      employeeId: externalId,
+      positionId: trainingPositionId,
+      departmentId: trainingDepartmentId,
+      startDateTime: iso(window.start),
+      endDateTime: iso(window.end),
+      note: `${trainingShiftNotePrefix} - ${sessionName} (Day ${day})`,
+      shiftTypeId: trainingShiftTypeId,
+      shiftType: "training",
+      allowConflicts: false,
+      metadata: {
+        sessionId,
+        day,
+      },
     },
-  });
+    { headers },
+  );
 }
 
 export async function assignToTrainingShift(
@@ -159,12 +165,13 @@ export async function assignToTrainingShift(
 ): Promise<PublishResult> {
   const window = buildShiftWindow(date, startTime, endTime);
 
-  if (!process.env.PLANDAY_API_TOKEN) {
+  const headers = await getPlandayHeaders();
+  if (!headers.Authorization) {
     return {
       personId,
       day,
       moved: false,
-      reason: "Planday credentials missing",
+      reason: "Planday access token unavailable",
     };
   }
 
