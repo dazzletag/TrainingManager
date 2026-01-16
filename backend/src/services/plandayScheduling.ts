@@ -107,6 +107,14 @@ function stripUndefined<T extends Record<string, unknown>>(payload: T) {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
 }
 
+function getShiftDate(shift: PlandayShift): string | undefined {
+  if (shift.startDateTime) {
+    const date = shift.startDateTime.split("T")[0];
+    if (date) return date;
+  }
+  return shift.date;
+}
+
 async function isOnHoliday(externalId: string, window: ShiftWindow): Promise<boolean> {
   const headers = await getPlandayHeaders();
   if (!headers.Authorization) {
@@ -166,7 +174,7 @@ async function unassignExistingShifts(
       const payload = stripUndefined({
         allowConflicts: false,
         comment: "Set to open for Mandatory Training",
-        date: shift.date,
+        date: getShiftDate(shift),
         employeeGroupId: shift.employeeGroupId,
         employeeId: "",
         endDateTime: shift.endDateTime,
