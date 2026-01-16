@@ -40,6 +40,8 @@ import {
 
   removeSessionAssignment,
 
+  recommendTrainingSession,
+
 } from "../services/api";
 
 
@@ -231,6 +233,7 @@ function TrainingSessionBuilder() {
   });
 
   const [publishFeedback, setPublishFeedback] = useState<PublishFeedback | null>(null);
+  const [recommendFeedback, setRecommendFeedback] = useState<{ count: number; at: string } | null>(null);
 
 
 
@@ -335,6 +338,22 @@ function TrainingSessionBuilder() {
       queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
 
       setSelectedSessionId(null);
+
+    },
+
+  });
+
+  const recommendMutation = useMutation({
+
+    mutationFn: (sessionId: string) => recommendTrainingSession(sessionId, role, userEmail),
+
+    onSuccess: (response) => {
+
+      queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
+
+      const count = response.data.recommended?.length ?? 0;
+
+      setRecommendFeedback({ count, at: new Date().toISOString() });
 
     },
 
@@ -762,6 +781,20 @@ function TrainingSessionBuilder() {
 
                 variant="outlined"
 
+                disabled={recommendMutation.isPending}
+
+                onClick={() => recommendMutation.mutate(selectedSession.id)}
+
+              >
+
+                Recommend
+
+              </Button>
+
+              <Button
+
+                variant="outlined"
+
                 color="error"
 
                 disabled={deleteSessionMutation.isPending}
@@ -789,6 +822,15 @@ function TrainingSessionBuilder() {
             <Alert severity="error" sx={{ mt: 2 }}>
 
               Unable to publish the session to Planday
+
+            </Alert>
+
+          )}
+          {recommendMutation.isError && (
+
+            <Alert severity="error" sx={{ mt: 2 }}>
+
+              Unable to generate recommendations
 
             </Alert>
 
@@ -848,6 +890,17 @@ function TrainingSessionBuilder() {
               )}
 
             </Box>
+
+          )}
+          {recommendFeedback && (
+
+            <Alert severity="success" sx={{ mt: 2 }}>
+
+              Recommended {recommendFeedback.count} staff for {selectedSession.name} ú{" "}
+
+              {new Date(recommendFeedback.at).toLocaleTimeString()}
+
+            </Alert>
 
           )}
 

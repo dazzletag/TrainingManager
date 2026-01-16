@@ -1,4 +1,7 @@
 import { Router } from "express";
+import { spawn } from "child_process";
+import fs from "fs";
+import path from "path";
 import { AppDataSource } from "../db/data-source";
 import { TrainingSession } from "../entities/TrainingSession";
 import { Person } from "../entities/Person";
@@ -27,6 +30,83 @@ function isExcludedPerson(person: Person) {
     status.includes("resign") ||
     status.includes("parental")
   );
+}
+
+const carePaycodes = new Set([
+  "C1",
+  "C2",
+  "C3",
+  "C5",
+  "TL1",
+  "TL3",
+  "TL4",
+  "NA1",
+  "N1",
+  "N3",
+  "N4",
+]);
+
+function resolveRoleType(paycode?: string) {
+  const code = paycode?.trim().toUpperCase();
+  return code && carePaycodes.has(code) ? "care" : "ancillary";
+}
+
+type RecommendInput = {
+  employee_number: string;
+  home: string;
+  role_type: string;
+  last_completed_date?: string;
+};
+
+async function runRecommendationScript(employees: RecommendInput[]): Promise<RecommendInput[]> {
+  const scriptPath = path.join(process.cwd(), "src", "services", "SuggestAttendees.py");
+  if (!fs.existsSync(scriptPath)) {
+    throw new Error(`Recommendation script not found at ${scriptPath}`);
+  }
+
+  const pythonBin = process.env.PYTHON_BIN ?? "python";
+  const payload = JSON.stringify({ employees });
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonBin, [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      reject(error);
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || `Recommendation script exited with ${code}`));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout || "{}");
+        resolve(parsed.recommended ?? []);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    child.stdin.write(payload);
+    child.stdin.end();
+  });
+}
+
+function fallbackRecommend(employees: RecommendInput[]): RecommendInput[] {
+  return employees
+    .slice()
+    .sort((a, b) => {
+      const aDate = a.last_completed_date ? Date.parse(a.last_completed_date) : 0;
+      const bDate = b.last_completed_date ? Date.parse(b.last_completed_date) : 0;
+      return aDate - bDate;
+    });
 }
 
 function resolveRequirementMeta(
@@ -107,7 +187,7 @@ function toIsoString(value?: Date | string | null) {
   return date.toISOString();
 }
 
-router.get("/overview", async (_req, res) => {
+async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassigned: any[] }> {
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
@@ -118,7 +198,7 @@ router.get("/overview", async (_req, res) => {
     where: { name: "Mandatory Training" },
   });
   if (!mandatoryRequirement) {
-    return res.json({ overview: [], unassigned: [] });
+    return { overview: [], unassigned: [] };
   }
 
   const sessions = await sessionRepo.find({
@@ -278,7 +358,12 @@ router.get("/overview", async (_req, res) => {
     lastTrainingAt: person.lastTrainingAt?.toISOString(),
   }));
 
-  res.json({ overview, unassigned: normalizedUnassigned });
+  return { overview, unassigned: normalizedUnassigned };
+}
+
+router.get("/overview", async (_req, res) => {
+  const data = await buildSchedulerOverviewData();
+  res.json(data);
 });
 
 router.post("/sessions", async (req, res) => {
@@ -357,6 +442,94 @@ router.post("/assign", async (req, res) => {
   await assignmentRepo.save(assignments);
 
   res.json({ assignments });
+});
+
+router.post("/sessions/:sessionId/recommend", async (req, res) => {
+  const { sessionId } = req.params;
+  if (!sessionId) {
+    return res.status(400).json({ message: "sessionId is required" });
+  }
+
+  const sessionRepo = AppDataSource.getRepository(TrainingSession);
+  const assignmentRepo = AppDataSource.getRepository(SessionAssignment);
+  const personRepo = AppDataSource.getRepository(Person);
+
+  const session = await sessionRepo.findOne({
+    where: { id: sessionId },
+    relations: {
+      assignments: {
+        person: true,
+      },
+    },
+  });
+
+  if (!session) {
+    return res.status(404).json({ message: "Session not found" });
+  }
+
+  const { unassigned } = await buildSchedulerOverviewData();
+  const unassignedByExternalId = new Map(unassigned.map((person) => [person.externalId, person]));
+
+  const employees: RecommendInput[] = unassigned.map((person) => ({
+    employee_number: person.externalId,
+    home: person.home,
+    role_type: resolveRoleType(person.role),
+    last_completed_date: person.lastTrainingAt ? person.lastTrainingAt.split("T")[0] : undefined,
+  }));
+
+  let recommended: RecommendInput[];
+  try {
+    recommended = await runRecommendationScript(employees);
+  } catch (error) {
+    console.warn("Recommendation script failed, falling back to default sort", error);
+    recommended = fallbackRecommend(employees);
+  }
+
+  const existingPersonIds = new Set(session.assignments.map((assignment) => assignment.person.id));
+  const recommendedPeople = recommended
+    .map((employee) => unassignedByExternalId.get(employee.employee_number))
+    .filter((person) => person && !existingPersonIds.has(person.id));
+  const recommendedIds = recommendedPeople.map((person) => person.id);
+
+  const people = recommendedIds.length
+    ? await personRepo.find({ where: { id: In(recommendedIds) } })
+    : [];
+  const personMap = new Map(people.map((person) => [person.id, person]));
+
+  const assignmentsToSave: SessionAssignment[] = [];
+  const baseTimestamp = Date.now();
+  let index = 0;
+
+  for (const person of recommendedPeople) {
+    const entity = personMap.get(person.id);
+    if (!entity) continue;
+    index += 1;
+    for (const day of [1, 2]) {
+      const dropZoneId = `recommend-${sessionId}-${person.id}-${baseTimestamp}-${index}-day-${day}`;
+      assignmentsToSave.push(
+        assignmentRepo.create({
+          session,
+          person: entity,
+          day,
+          dropZoneId,
+        }),
+      );
+    }
+  }
+
+  if (assignmentsToSave.length) {
+    await assignmentRepo.save(assignmentsToSave);
+  }
+
+  res.json({
+    recommended: recommendedPeople.map((person) => ({
+      id: person.id,
+      externalId: person.externalId,
+      name: person.name,
+      home: person.home,
+    })),
+    assignmentsCreated: assignmentsToSave.length,
+  });
 });
 
 router.post("/assign/remove", async (req, res) => {

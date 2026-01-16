@@ -145,3 +145,13 @@ export function deleteTrainingSession(sessionId: string, role: string, email: st
     headers: withHeaders(role, email),
   });
 }
+
+export function recommendTrainingSession(sessionId: string, role: string, email: string) {
+  return apiClient.post(
+    `/scheduler/sessions/${sessionId}/recommend`,
+    {},
+    {
+      headers: withHeaders(role, email),
+    },
+  );
+}
