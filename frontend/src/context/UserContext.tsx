@@ -13,7 +13,7 @@ interface UserContextValue {
   setUserEmail: (value: string) => void;
 }
 
-const defaultExternalId = import.meta.env.VITE_DEMO_PERSON_EXTERNAL_ID ?? "planday-employee-001";
+const defaultExternalId = import.meta.env.VITE_DEMO_PERSON_EXTERNAL_ID ?? "";
 const placeholderExternalId = "planday-employee-001";
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -24,7 +24,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [userEmail, setUserEmail] = useState("demo.user@trainingmanager.local");
 
   useEffect(() => {
-    if (personExternalId !== placeholderExternalId || defaultExternalId !== placeholderExternalId) {
+    if (personExternalId && personExternalId !== placeholderExternalId) {
       return;
     }
 
