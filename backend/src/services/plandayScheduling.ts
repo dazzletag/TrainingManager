@@ -154,11 +154,13 @@ async function unassignExistingShifts(
   if (!headers.Authorization) {
     return { ok: false };
   }
+  const windowDate = window.start.toISOString().split("T")[0];
   try {
     const response = await withRetry(() =>
       plandaySchedulingClient.get<{ data: PlandayShift[] }>("/shifts", {
         params: {
           employeeId: externalId,
+          date: windowDate,
           startDateTime: iso(window.start),
           endDateTime: iso(window.end),
         },
