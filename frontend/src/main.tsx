@@ -6,18 +6,21 @@ import App from "./App.tsx";
 import { UserProvider } from "./context/UserContext";
 import { theme } from "./theme";
 import "./index.css";
+import { AuthProvider } from "./auth/AuthContext";
 
 const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <UserProvider>
-          <App />
-        </UserProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <UserProvider>
+            <App />
+          </UserProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   </React.StrictMode>,
 );

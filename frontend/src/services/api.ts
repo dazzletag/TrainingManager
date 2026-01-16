@@ -102,6 +102,30 @@ export function fetchRoles(role: string, email: string) {
   });
 }
 
+export function fetchCurrentUserRole(email: string) {
+  return apiClient.get("/admin/users/me", {
+    headers: withHeaders("staff", email),
+  });
+}
+
+export function fetchAdminUsers(role: string, email: string) {
+  return apiClient.get("/admin/users", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function upsertAdminUser(body: { email: string; role: string }, role: string, email: string) {
+  return apiClient.post("/admin/users", body, {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function deleteAdminUser(id: string, role: string, email: string) {
+  return apiClient.delete(`/admin/users/${id}`, {
+    headers: withHeaders(role, email),
+  });
+}
+
 export function fetchSchedulerOverview(role: string, email: string) {
   return apiClient.get("/scheduler/overview", {
     headers: withHeaders(role, email),

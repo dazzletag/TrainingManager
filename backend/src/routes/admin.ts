@@ -4,6 +4,7 @@ import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { Role } from "../entities/Role";
 import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
+import { AppUser } from "../entities/AppUser";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 
@@ -12,6 +13,70 @@ const router = Router();
 router.get("/roles", async (req, res) => {
   const roles = await AppDataSource.getRepository(Role).find();
   res.json({ roles });
+});
+
+const allowedAppRoles = new Set(["admin", "manager"]);
+
+async function ensureAdminBootstrap(currentEmail?: string) {
+  if (!currentEmail) {
+    return;
+  }
+  const repo = AppDataSource.getRepository(AppUser);
+  const count = await repo.count();
+  if (count === 0) {
+    await repo.save(repo.create({ email: currentEmail.toLowerCase(), role: "admin" }));
+  }
+}
+
+router.get("/users/me", async (req, res) => {
+  const email = req.user?.email?.toLowerCase() ?? "";
+  await ensureAdminBootstrap(email);
+  if (!email) {
+    return res.json({ role: "staff" });
+  }
+  const repo = AppDataSource.getRepository(AppUser);
+  const entry = await repo.findOne({ where: { email } });
+  if (!entry) {
+    return res.json({ role: "staff" });
+  }
+  return res.json({ role: entry.role });
+});
+
+router.get("/users", async (req, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const repo = AppDataSource.getRepository(AppUser);
+  const users = await repo.find({ order: { email: "ASC" } });
+  res.json({ users });
+});
+
+router.post("/users", async (req, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const role = String(req.body?.role ?? "").trim().toLowerCase();
+  if (!email || !allowedAppRoles.has(role)) {
+    return res.status(400).json({ message: "Invalid email or role" });
+  }
+  const repo = AppDataSource.getRepository(AppUser);
+  const existing = await repo.findOne({ where: { email } });
+  const roleValue = role as "admin" | "manager";
+  const entry = existing
+    ? repo.merge(existing, { role: roleValue })
+    : repo.create({ email, role: roleValue });
+  const saved = await repo.save(entry);
+  res.json({ user: saved });
+});
+
+router.delete("/users/:id", async (req, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const repo = AppDataSource.getRepository(AppUser);
+  await repo.delete({ id: req.params.id });
+  res.json({ ok: true });
 });
 
 router.get("/training-requirements", async (req, res) => {

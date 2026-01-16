@@ -24,7 +24,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence } from "../services/api";
+import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence, fetchAdminUsers, upsertAdminUser, deleteAdminUser } from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import { useState } from "react";
 
@@ -38,6 +38,7 @@ function AdminPage() {
   const { role, userEmail } = useUserContext();
   const [tabIndex, setTabIndex] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [accessForm, setAccessForm] = useState({ email: "", role: "manager" });
   const [formValues, setFormValues] = useState({
     name: "",
     description: "",
@@ -68,6 +69,12 @@ function AdminPage() {
     queryFn: () => fetchManagerAtRisk(role, userEmail).then((response) => response.data),
   });
 
+  const accessQuery = useQuery({
+    queryKey: ["adminUsers", role],
+    queryFn: () => fetchAdminUsers(role, userEmail).then((response) => response.data),
+    enabled: role === "admin",
+  });
+
   const createMutation = useMutation({
     mutationFn: (payload: any) => createTrainingRequirement(payload, role, userEmail),
     onSuccess: () => trainingRequirementsQuery.refetch(),
@@ -80,6 +87,16 @@ function AdminPage() {
 
   const approveMutation = useMutation({
     mutationFn: (evidenceId: string) => approveEvidence(evidenceId, { approvedBy: userEmail, confidenceOverride: 100 }, role, userEmail),
+  });
+
+  const accessMutation = useMutation({
+    mutationFn: (payload: { email: string; role: string }) => upsertAdminUser(payload, role, userEmail),
+    onSuccess: () => accessQuery.refetch(),
+  });
+
+  const deleteAccessMutation = useMutation({
+    mutationFn: (id: string) => deleteAdminUser(id, role, userEmail),
+    onSuccess: () => accessQuery.refetch(),
   });
 
   const handleRoleSelection = (event: SelectChangeEvent<typeof formValues.roleExternalIds>) => {
@@ -97,6 +114,7 @@ function AdminPage() {
         <Tab label="Requirements" />
         <Tab label="Evidence Overrides" />
         <Tab label="Audit Trail" />
+        <Tab label="Access" />
       </Tabs>
 
       {tabIndex === 0 && (
@@ -347,6 +365,79 @@ function AdminPage() {
             {!auditQuery.data?.logs.length && (
               <ListItem>
                 <ListItemText primary="No audit entries yet" />
+              </ListItem>
+            )}
+          </List>
+        </Box>
+      )}
+
+      {tabIndex === 3 && (
+        <Box mt={2}>
+          <Typography variant="subtitle1" gutterBottom>
+            Access Management
+          </Typography>
+          {role !== "admin" && (
+            <Alert severity="warning">Only admins can manage access.</Alert>
+          )}
+          {role === "admin" && (
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "2fr 1fr auto" }, alignItems: "center" }}>
+              <TextField
+                label="User email"
+                size="small"
+                value={accessForm.email}
+                onChange={(event) => setAccessForm((prev) => ({ ...prev, email: event.target.value }))}
+              />
+              <FormControl size="small" fullWidth>
+                <Select
+                  value={accessForm.role}
+                  onChange={(event) => setAccessForm((prev) => ({ ...prev, role: event.target.value }))}
+                >
+                  <MenuItem value="admin">Admin</MenuItem>
+                  <MenuItem value="manager">Manager</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="contained"
+                disabled={accessMutation.status === "pending"}
+                onClick={() => {
+                  if (!accessForm.email.trim()) {
+                    return;
+                  }
+                  accessMutation.mutate({
+                    email: accessForm.email.trim(),
+                    role: accessForm.role,
+                  });
+                }}
+              >
+                Add / Update
+              </Button>
+            </Box>
+          )}
+          <List sx={{ mt: 2 }}>
+            {accessQuery.isLoading && (
+              <ListItem>
+                <CircularProgress size={24} />
+              </ListItem>
+            )}
+            {accessQuery.data?.users?.map((user: any) => (
+              <ListItem
+                key={user.id}
+                secondaryAction={
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => deleteAccessMutation.mutate(user.id)}
+                  >
+                    Remove
+                  </Button>
+                }
+              >
+                <ListItemText primary={user.email} secondary={`Role: ${user.role}`} />
+              </ListItem>
+            ))}
+            {!accessQuery.isLoading && !accessQuery.data?.users?.length && (
+              <ListItem>
+                <ListItemText primary="No admin or manager accounts configured yet." />
               </ListItem>
             )}
           </List>

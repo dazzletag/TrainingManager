@@ -9,6 +9,7 @@ import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
 import { TrainingSession } from "../entities/TrainingSession";
 import { SessionAssignment } from "../entities/SessionAssignment";
+import { AppUser } from "../entities/AppUser";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ export const AppDataSource = new DataSource({
     AuditLog,
     TrainingSession,
     SessionAssignment,
+    AppUser,
   ],
   migrations: [__dirname + "/migrations/*.{ts,js}"],
   options: {

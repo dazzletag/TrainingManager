@@ -12,6 +12,7 @@ import {
   ListItemText,
   Toolbar,
   Typography,
+  Button,
   useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -21,6 +22,7 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import InsightsIcon from "@mui/icons-material/Insights";
 import { useState } from "react";
 import { useUserContext } from "../context/UserContext";
+import { useAuth } from "../auth/AuthContext";
 
 const drawerWidth = 240;
 
@@ -34,7 +36,8 @@ const navigation = [
 function Layout() {
   const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { role } = useUserContext();
+  const { role, userEmail } = useUserContext();
+  const { logout } = useAuth();
   const visibleNavigation = navigation.filter((item) => !item.adminOnly || role === "admin");
 
   const drawer = (
@@ -93,6 +96,16 @@ function Layout() {
           <Typography variant="h6" noWrap component="div">
             Mandatory Training Platform
           </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {userEmail && (
+              <Typography variant="body2" color="inherit">
+                {userEmail}
+              </Typography>
+            )}
+            <Button color="inherit" onClick={logout}>
+              Sign out
+            </Button>
+          </Box>
         </Toolbar>
       </AppBar>
       <Drawer

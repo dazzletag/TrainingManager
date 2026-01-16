@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { fetchStaffDirectory } from "../services/api";
+import { fetchCurrentUserRole, fetchStaffDirectory } from "../services/api";
+import { useAuth } from "../auth/AuthContext";
 
 type Role = "staff" | "manager" | "admin";
 
@@ -19,12 +20,46 @@ const placeholderExternalId = "planday-employee-001";
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("admin");
+  const { account } = useAuth();
+  const [role, setRole] = useState<Role>("staff");
   const [personExternalId, setPersonExternalId] = useState(defaultExternalId);
-  const [userEmail, setUserEmail] = useState("demo.user@trainingmanager.local");
+  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    if (personExternalId && personExternalId !== placeholderExternalId) {
+    if (!account) {
+      setUserEmail("");
+      return;
+    }
+    setUserEmail(account.username ?? "");
+  }, [account]);
+
+  useEffect(() => {
+    if (!userEmail) {
+      return;
+    }
+    let isActive = true;
+    fetchCurrentUserRole(userEmail)
+      .then((response) => {
+        const nextRole = response.data?.role;
+        if (isActive && (nextRole === "admin" || nextRole === "manager")) {
+          setRole(nextRole);
+        } else if (isActive) {
+          setRole("staff");
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setRole("staff");
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (!userEmail || (personExternalId && personExternalId !== placeholderExternalId)) {
       return;
     }
 
