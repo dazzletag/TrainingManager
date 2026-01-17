@@ -42,7 +42,9 @@ router.get("/next-courses", async (_req, res) => {
       cs.missingCount
     FROM course_status cs
     INNER JOIN training_requirement tr ON tr.id = cs.courseId
-    WHERE tr.enabled = 1;
+    WHERE tr.enabled = 1
+      AND tr.name NOT LIKE '%SCTV%'
+      AND tr.name NOT LIKE '%Competency%';
   `);
 
   const recommendations = rows
