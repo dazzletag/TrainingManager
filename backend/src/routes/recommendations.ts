@@ -33,6 +33,7 @@ router.get("/next-courses", async (_req, res) => {
       tr.id AS courseId,
       tr.name AS courseName,
       tr.importanceLevel,
+      tr.requiredLevel,
       tr.minimumAttendees,
       tr.enabled,
       cs.eligibleCount,
@@ -59,6 +60,7 @@ router.get("/next-courses", async (_req, res) => {
         toNumber(row.minimumAttendees, settings.minimumAttendeesDefault),
       );
       const importanceLevel = Math.max(1, toNumber(row.importanceLevel, 1));
+      const requiredLevel = Math.max(1, toNumber(row.requiredLevel, 1));
       const missingCount = toNumber(row.missingCount);
       const averageDaysToExpiryRaw = row.averageDaysToExpiry;
       const averageDaysToExpiry =
@@ -85,6 +87,7 @@ router.get("/next-courses", async (_req, res) => {
         courseId: row.courseId,
         courseName: row.courseName,
         importanceLevel,
+        requiredLevel,
         eligibleCount,
         expiredCount,
         atRiskCount,

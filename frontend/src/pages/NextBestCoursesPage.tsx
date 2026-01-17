@@ -10,6 +10,8 @@ import {
   DialogTitle,
   Divider,
   Paper,
+  ToggleButton,
+  ToggleButtonGroup,
   Stack,
   Typography,
 } from "@mui/material";
@@ -26,6 +28,7 @@ type Recommendation = {
   courseId: string;
   courseName: string;
   importanceLevel: number;
+  requiredLevel: number;
   eligibleCount: number;
   expiredCount: number;
   atRiskCount: number;
@@ -67,6 +70,7 @@ function ImportanceDots({ level }: { level: number }) {
 function NextBestCoursesPage() {
   const { role, userEmail } = useUserContext();
   const [selectedCourse, setSelectedCourse] = useState<Recommendation | null>(null);
+  const [levelFilter, setLevelFilter] = useState<"all" | "essential" | "nice" | "home">("all");
 
   const recommendationsQuery = useQuery({
     queryKey: ["nextBestCourses", role],
@@ -80,14 +84,22 @@ function NextBestCoursesPage() {
     enabled: Boolean(selectedCourse),
   });
 
-  const totals = useMemo(() => {
+  const filteredRecommendations = useMemo(() => {
     const list: Recommendation[] = recommendationsQuery.data?.recommendations ?? [];
+    if (levelFilter === "all") return list;
+    const levelMap: Record<string, number> = { essential: 1, nice: 2, home: 3 };
+    const target = levelMap[levelFilter];
+    return list.filter((course) => course.requiredLevel === target);
+  }, [recommendationsQuery.data, levelFilter]);
+
+  const totals = useMemo(() => {
+    const list: Recommendation[] = filteredRecommendations;
     return {
       courses: list.length,
       expired: list.reduce((acc, item) => acc + item.expiredCount, 0),
       atRisk: list.reduce((acc, item) => acc + item.atRiskCount, 0),
     };
-  }, [recommendationsQuery.data]);
+  }, [filteredRecommendations]);
 
   return (
     <Box
@@ -130,6 +142,17 @@ function NextBestCoursesPage() {
             <Typography color="text.secondary">
               Data-driven recommendations based on compliance risk, course criticality, and cohort size.
             </Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={levelFilter}
+              onChange={(_, value) => value && setLevelFilter(value)}
+              sx={{ mt: 2 }}
+            >
+              <ToggleButton value="all">All</ToggleButton>
+              <ToggleButton value="essential">Essential</ToggleButton>
+              <ToggleButton value="nice">Nice to have</ToggleButton>
+              <ToggleButton value="home">Required for home</ToggleButton>
+            </ToggleButtonGroup>
             <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ mt: 2 }}>
               <Paper sx={{ p: 2, flex: 1, borderRadius: 2, background: "rgba(15,98,254,0.08)" }}>
                 <Typography variant="subtitle2" color="text.secondary">
@@ -167,7 +190,7 @@ function NextBestCoursesPage() {
 
         {recommendationsQuery.error && <Alert severity="error">Unable to load recommendations</Alert>}
 
-        {recommendationsQuery.data?.recommendations?.length === 0 && (
+        {filteredRecommendations.length === 0 && (
           <Alert severity="info">No courses meet the recommendation thresholds right now.</Alert>
         )}
 
@@ -178,7 +201,7 @@ function NextBestCoursesPage() {
             gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
           }}
         >
-          {(recommendationsQuery.data?.recommendations ?? []).map((course: Recommendation) => {
+          {filteredRecommendations.map((course: Recommendation) => {
             const urgency = getUrgency(course.recommendationScore);
             return (
               <Paper
