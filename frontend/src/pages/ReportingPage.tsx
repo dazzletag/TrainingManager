@@ -133,14 +133,6 @@ export default function ReportingPage() {
     queryFn: () => fetchReportingMatrix(filters).then((response) => response.data),
   });
 
-  if (role !== "admin") {
-    return (
-      <Alert severity="warning">
-        Reporting & Insights is restricted to admin users.
-      </Alert>
-    );
-  }
-
   const summary = summaryQuery.data;
   const compliance = complianceQuery.data;
   const forecast = forecastQuery.data;
@@ -307,6 +299,14 @@ export default function ReportingPage() {
     }));
     return { homes, values };
   }, [filteredRagByHome]);
+
+  if (role !== "admin") {
+    return (
+      <Alert severity="warning">
+        Reporting & Insights is restricted to admin users.
+      </Alert>
+    );
+  }
 
   return (
     <Stack spacing={3}>
