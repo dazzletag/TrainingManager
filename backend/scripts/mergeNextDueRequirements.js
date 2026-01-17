@@ -204,6 +204,10 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
 
 async function main() {
   const apply = process.argv.includes("--apply");
+  const rename = process.argv.includes("--rename");
+  if (apply && rename) {
+    throw new Error("Choose either --apply or --rename, not both.");
+  }
   const pool = await sql.connect(config);
   const requirementsResult = await pool.request().query(
     "SELECT id, name, validityPeriodMonths, requiredLevel, category, importanceLevel, minimumAttendees, enabled, mandatory FROM training_requirement",
@@ -235,9 +239,26 @@ async function main() {
     console.log(JSON.stringify(skipped, null, 2));
   }
 
-  if (!apply) {
-    console.log("Dry run only. Re-run with --apply to perform merges.");
+  if (!apply && !rename) {
+    console.log("Dry run only. Re-run with --apply to perform merges or --rename to rename Next Due titles.");
     await pool.close();
+    return;
+  }
+
+  if (rename) {
+    for (const { base, next } of merges) {
+      console.log(`Skipping rename for '${next.name}' because base '${base.name}' exists.`);
+    }
+    for (const entry of skipped) {
+      if (!entry.baseName) continue;
+      console.log(`Renaming '${entry.nextDue}' -> '${entry.baseName}'`);
+      const update = new sql.Request(pool);
+      update.input("id", sql.UniqueIdentifier, requirements.find((row) => row.name === entry.nextDue)?.id);
+      update.input("name", sql.NVarChar, entry.baseName);
+      await update.query("UPDATE training_requirement SET name = @name, updatedAt = GETUTCDATE() WHERE id = @id");
+    }
+    await pool.close();
+    console.log("Rename completed.");
     return;
   }
 
