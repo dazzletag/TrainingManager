@@ -27,7 +27,7 @@ import {
 import type { SelectChangeEvent } from "@mui/material";
 import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence, fetchAdminUsers, upsertAdminUser, deleteAdminUser, fetchRecommendationSettings, updateRecommendationSettings } from "../services/api";
 import { useUserContext } from "../context/UserContext";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
@@ -172,6 +172,29 @@ function AdminPage() {
     return 0;
   });
 
+  const requirementGroups = [
+    {
+      label: "SCTV",
+      items: sortedRequirements.filter((item: any) =>
+        String(item.name ?? "").toLowerCase().includes("sctv"),
+      ),
+    },
+    {
+      label: "Competencies",
+      items: sortedRequirements.filter((item: any) =>
+        String(item.name ?? "").toLowerCase().includes("competency"),
+      ),
+    },
+    {
+      label: "Other Courses",
+      items: sortedRequirements.filter(
+        (item: any) =>
+          !String(item.name ?? "").toLowerCase().includes("sctv") &&
+          !String(item.name ?? "").toLowerCase().includes("competency"),
+      ),
+    },
+  ];
+
   const handleSortChange = (key: string) => {
     setSortState((prev) => {
       if (prev.key === key) {
@@ -223,42 +246,60 @@ function AdminPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedRequirements.map((requirement: any) => (
-                  <TableRow key={requirement.id}>
-                    <TableCell>{requirement.name}</TableCell>
-                    <TableCell>{requirement.validityPeriodMonths}</TableCell>
-                    <TableCell>
-                      {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
-                    </TableCell>
-                    <TableCell>{requirement.category ?? "-"}</TableCell>
-                    <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
-                    <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
-                    <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
-                    <TableCell>{requirement.mandatory ? "Yes" : "No"}</TableCell>
-                    <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setEditingId(requirement.id);
-                          setFormValues({
-                            name: requirement.name ?? "",
-                            description: requirement.description ?? "",
-                            validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
-                            mandatory: requirement.mandatory ?? true,
-                            requiredLevel: requirement.requiredLevel ?? 1,
-                            category: requirement.category ?? "",
-                            importanceLevel: requirement.importanceLevel ?? 3,
-                            minimumAttendees: requirement.minimumAttendees ?? 8,
-                            enabled: requirement.enabled ?? true,
-                            roleExternalIds: requirement.roles.map((role: any) => role.externalId),
-                          });
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                {requirementGroups.map((group) => (
+                  <Fragment key={group.label}>
+                    <TableRow>
+                      <TableCell colSpan={10} sx={{ bgcolor: "rgba(15, 98, 254, 0.08)" }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {group.label}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    {group.items.map((requirement: any) => (
+                      <TableRow key={requirement.id}>
+                        <TableCell>{requirement.name}</TableCell>
+                        <TableCell>{requirement.validityPeriodMonths}</TableCell>
+                        <TableCell>
+                          {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
+                        </TableCell>
+                        <TableCell>{requirement.category ?? "-"}</TableCell>
+                        <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
+                        <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
+                        <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
+                        <TableCell>{requirement.mandatory ? "Yes" : "No"}</TableCell>
+                        <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setEditingId(requirement.id);
+                              setFormValues({
+                                name: requirement.name ?? "",
+                                description: requirement.description ?? "",
+                                validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
+                                mandatory: requirement.mandatory ?? true,
+                                requiredLevel: requirement.requiredLevel ?? 1,
+                                category: requirement.category ?? "",
+                                importanceLevel: requirement.importanceLevel ?? 3,
+                                minimumAttendees: requirement.minimumAttendees ?? 8,
+                                enabled: requirement.enabled ?? true,
+                                roleExternalIds: requirement.roles.map((role: any) => role.externalId),
+                              });
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!group.items.length && (
+                      <TableRow>
+                        <TableCell colSpan={10} sx={{ color: "text.secondary" }}>
+                          No courses in this section.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
