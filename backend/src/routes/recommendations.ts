@@ -12,7 +12,8 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-router.get("/next-courses", async (_req, res) => {
+router.get("/next-courses", async (req, res) => {
+  const requiredLevelFilter = Number(req.query.requiredLevel ?? 0);
   const settings = await getRecommendationSettings();
 
   const rows = await AppDataSource.query(`
@@ -47,7 +48,8 @@ router.get("/next-courses", async (_req, res) => {
       AND tr.name NOT LIKE '%SCTV%'
       AND tr.name NOT LIKE '%Competency%'
       AND tr.name NOT LIKE '%Induction%'
-      AND tr.name NOT LIKE '%Flu Vaccine%';
+      AND tr.name NOT LIKE '%Flu Vaccine%'
+      ${requiredLevelFilter ? "AND tr.requiredLevel = " + requiredLevelFilter : ""};
   `);
 
   const recommendations = rows
@@ -101,7 +103,30 @@ router.get("/next-courses", async (_req, res) => {
     .sort((a: any, b: any) => b.recommendationScore - a.recommendationScore)
     .map(({ _volumeGate, ...item }: any) => item);
 
-  res.json({ recommendations });
+  let totals = { expiredCount: 0, atRiskCount: 0 };
+  if (recommendations.length) {
+    const placeholders = recommendations.map((_: any, index: number) => `@${index}`).join(", ");
+    const totalsRows = await AppDataSource.query(
+      `
+        SELECT
+          COUNT(DISTINCT CASE WHEN ets.status = 'Expired' THEN ets.employeeId END) AS expiredCount,
+          COUNT(DISTINCT CASE WHEN ets.status = 'AtRisk' THEN ets.employeeId END) AS atRiskCount
+        FROM vw_employee_training_status ets
+        INNER JOIN person p ON p.id = ets.employeeId
+        WHERE p.isActive = 1
+          AND ets.courseId IN (${placeholders});
+      `,
+      recommendations.map((item: any) => item.courseId),
+    );
+    if (totalsRows.length) {
+      totals = {
+        expiredCount: toNumber(totalsRows[0].expiredCount),
+        atRiskCount: toNumber(totalsRows[0].atRiskCount),
+      };
+    }
+  }
+
+  res.json({ recommendations, totals });
 });
 
 router.get("/next-courses/:courseId/eligible", async (req, res) => {

@@ -192,9 +192,10 @@ export function recommendTrainingSession(sessionId: string, role: string, email:
   );
 }
 
-export function fetchNextBestCourses(role: string, email: string) {
+export function fetchNextBestCourses(role: string, email: string, params?: { requiredLevel?: number }) {
   return apiClient.get("/recommendations/next-courses", {
     headers: withHeaders(role, email),
+    params,
   });
 }
 

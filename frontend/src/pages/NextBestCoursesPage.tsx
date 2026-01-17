@@ -37,6 +37,11 @@ type Recommendation = {
   rationale: string;
 };
 
+type RecommendationTotals = {
+  expiredCount: number;
+  atRiskCount: number;
+};
+
 const urgencyScale = [
   { label: "Low", color: "success" as const, min: 0 },
   { label: "Medium", color: "warning" as const, min: 15 },
@@ -73,8 +78,11 @@ function NextBestCoursesPage() {
   const [levelFilter, setLevelFilter] = useState<"all" | "essential" | "nice" | "home">("all");
 
   const recommendationsQuery = useQuery({
-    queryKey: ["nextBestCourses", role],
-    queryFn: () => fetchNextBestCourses(role, userEmail).then((response) => response.data),
+    queryKey: ["nextBestCourses", role, levelFilter],
+    queryFn: () =>
+      fetchNextBestCourses(role, userEmail, {
+        requiredLevel: levelFilter === "all" ? undefined : levelFilter === "essential" ? 1 : levelFilter === "nice" ? 2 : 3,
+      }).then((response) => response.data),
   });
 
   const eligibleQuery = useQuery({
@@ -84,22 +92,17 @@ function NextBestCoursesPage() {
     enabled: Boolean(selectedCourse),
   });
 
-  const filteredRecommendations = useMemo(() => {
-    const list: Recommendation[] = recommendationsQuery.data?.recommendations ?? [];
-    if (levelFilter === "all") return list;
-    const levelMap: Record<string, number> = { essential: 1, nice: 2, home: 3 };
-    const target = levelMap[levelFilter];
-    return list.filter((course) => course.requiredLevel === target);
-  }, [recommendationsQuery.data, levelFilter]);
+  const filteredRecommendations: Recommendation[] = recommendationsQuery.data?.recommendations ?? [];
+  const totalsFromApi: RecommendationTotals = recommendationsQuery.data?.totals ?? { expiredCount: 0, atRiskCount: 0 };
 
-  const totals = useMemo(() => {
-    const list: Recommendation[] = filteredRecommendations;
-    return {
-      courses: list.length,
-      expired: list.reduce((acc, item) => acc + item.expiredCount, 0),
-      atRisk: list.reduce((acc, item) => acc + item.atRiskCount, 0),
-    };
-  }, [filteredRecommendations]);
+  const totals = useMemo(
+    () => ({
+      courses: filteredRecommendations.length,
+      expired: totalsFromApi.expiredCount ?? 0,
+      atRisk: totalsFromApi.atRiskCount ?? 0,
+    }),
+    [filteredRecommendations.length, totalsFromApi],
+  );
 
   return (
     <Box
