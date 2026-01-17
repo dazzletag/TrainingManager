@@ -40,3 +40,7 @@ export function fetchReportingForecast(filters?: ReportingFilters) {
 export function fetchReportingUtilisation(filters?: ReportingFilters) {
   return reportingClient.get("/reporting/utilisation", { params: buildParams(filters) });
 }
+
+export function fetchReportingMatrix(filters?: ReportingFilters) {
+  return reportingClient.get("/reporting/matrix", { params: buildParams(filters) });
+}

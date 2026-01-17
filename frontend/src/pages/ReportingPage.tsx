@@ -16,10 +16,16 @@ import {
   Skeleton,
   Stack,
   Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { fetchReportingCompliance, fetchReportingForecast, fetchReportingSummary, fetchReportingUtilisation } from "../services/reportingApi";
+import { fetchReportingCompliance, fetchReportingForecast, fetchReportingMatrix, fetchReportingSummary, fetchReportingUtilisation } from "../services/reportingApi";
 import type { ReportingFilters } from "../services/reportingApi";
 import { useUserContext } from "../context/UserContext";
 import React from "react";
@@ -122,6 +128,11 @@ export default function ReportingPage() {
     queryFn: () => fetchReportingUtilisation().then((response) => response.data),
   });
 
+  const matrixQuery = useQuery({
+    queryKey: ["reportingMatrix", filters],
+    queryFn: () => fetchReportingMatrix(filters).then((response) => response.data),
+  });
+
   if (role !== "admin") {
     return (
       <Alert severity="warning">
@@ -134,6 +145,7 @@ export default function ReportingPage() {
   const compliance = complianceQuery.data;
   const forecast = forecastQuery.data;
   const utilisation = utilisationQuery.data;
+  const matrix = matrixQuery.data;
 
   const availableHomes = compliance?.meta?.homes ?? (compliance?.byHome ?? []).map((item: any) => item.home);
   const availableRoles = compliance?.meta?.roles ?? (compliance?.byRole ?? []).map((item: any) => item.roleName);
@@ -523,6 +535,83 @@ export default function ReportingPage() {
           </Suspense>
         </ChartCard>
       </Box>
+
+      <ChartCard
+        title="Essential & SCTV Expiry Matrix"
+        description="Rows show employees and columns show essential or SCTV courses. Overdue essential items are highlighted."
+      >
+        {matrixQuery.isLoading && <Skeleton height={240} />}
+        {matrixQuery.error && <Alert severity="error">Unable to load matrix report</Alert>}
+        {matrix && (
+          <TableContainer sx={{ maxHeight: 420 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 2,
+                      backgroundColor: "background.paper",
+                    }}
+                  >
+                    Employee
+                  </TableCell>
+                  {matrix.courses.map((course: any) => (
+                    <TableCell key={course.id} sx={{ minWidth: 160 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                        {course.name}
+                      </Typography>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {matrix.employees.map((employee: any) => (
+                  <TableRow key={employee.id}>
+                    <TableCell
+                      sx={{
+                        position: "sticky",
+                        left: 0,
+                        backgroundColor: "background.paper",
+                        zIndex: 1,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {employee.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {employee.home} · {employee.role}
+                      </Typography>
+                    </TableCell>
+                    {matrix.courses.map((course: any) => {
+                      const entry = employee.courses?.[course.id];
+                      const expiry = entry?.expiryDate ? new Date(entry.expiryDate) : null;
+                      const isOverdue = entry?.complianceStatus === "overdue";
+                      const isEssential = course.requiredLevel === 1;
+                      const highlight = isEssential && isOverdue;
+                      return (
+                        <TableCell
+                          key={course.id}
+                          sx={{
+                            bgcolor: highlight ? "rgba(211, 47, 47, 0.12)" : "transparent",
+                            color: highlight ? "#b71c1c" : "inherit",
+                            fontWeight: highlight ? 700 : 400,
+                          }}
+                        >
+                          {expiry
+                            ? expiry.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                            : "-"}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </ChartCard>
 
       <Box
         sx={{
