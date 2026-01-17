@@ -68,7 +68,8 @@ module.exports = async function (context, req) {
         complianceStatus
       FROM vw_training_compliance_current
       WHERE mandatory = 1
-        AND (requiredLevel = 1 OR UPPER(requirementName) LIKE '%SCTV%')${clause}
+        AND requiredLevel = 1
+        AND UPPER(requirementName) LIKE '%SCTV%'${clause}
       ORDER BY fullName, requirementName
       OPTION (RECOMPILE)
       `,

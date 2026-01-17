@@ -537,8 +537,8 @@ export default function ReportingPage() {
       </Box>
 
       <ChartCard
-        title="Essential & SCTV Expiry Matrix"
-        description="Rows show employees and columns show essential or SCTV courses. Overdue essential items are highlighted."
+        title="Essential SCTV Expiry Matrix"
+        description="Rows show employees and columns show SCTV courses that are essential. Overdue essential items are highlighted."
       >
         {matrixQuery.isLoading && <Skeleton height={240} />}
         {matrixQuery.error && <Alert severity="error">Unable to load matrix report</Alert>}
