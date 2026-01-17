@@ -20,6 +20,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import InsightsIcon from "@mui/icons-material/Insights";
+import AutoGraphIcon from "@mui/icons-material/AutoGraph";
 import { useState } from "react";
 import { useUserContext } from "../context/UserContext";
 import { useAuth } from "../auth/AuthContext";
@@ -29,6 +30,7 @@ const drawerWidth = 240;
 const navigation = [
   { label: "Staff", path: "/staff", icon: <SchoolIcon /> },
   { label: "Manager", path: "/manager", icon: <AssessmentIcon /> },
+  { label: "Next Best Courses", path: "/next-best-courses", icon: <AutoGraphIcon /> },
   { label: "Admin", path: "/admin", icon: <AdminPanelSettingsIcon /> },
   { label: "Reporting & Insights", path: "/admin/reporting", icon: <InsightsIcon />, adminOnly: true },
 ];

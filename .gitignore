@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 .env
+backend/.env
 .DS_Store
 coverage/
 frontend/node_modules/
@@ -12,3 +13,6 @@ infra/.terraform/
 *.log
 backend.zip
 frontend-package.zip
+backend-deploy.zip
+frontend-deploy.zip
+frontend-logs*

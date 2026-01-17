@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://trainingmanager-backend.azurewebsites.net/api/v1";
 
 function withHeaders(role: string, email: string) {
   return {
@@ -86,6 +86,18 @@ export function updateTrainingRequirement(id: string, body: any, role: string, e
 
 export function fetchAuditTrail(role: string, email: string) {
   return apiClient.get("/admin/audit", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function fetchRecommendationSettings(role: string, email: string) {
+  return apiClient.get("/admin/recommendation-settings", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function updateRecommendationSettings(body: any, role: string, email: string) {
+  return apiClient.put("/admin/recommendation-settings", body, {
     headers: withHeaders(role, email),
   });
 }
@@ -178,4 +190,16 @@ export function recommendTrainingSession(sessionId: string, role: string, email:
       headers: withHeaders(role, email),
     },
   );
+}
+
+export function fetchNextBestCourses(role: string, email: string) {
+  return apiClient.get("/recommendations/next-courses", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function fetchNextBestCourseEligible(courseId: string, role: string, email: string) {
+  return apiClient.get(`/recommendations/next-courses/${courseId}/eligible`, {
+    headers: withHeaders(role, email),
+  });
 }

@@ -4,6 +4,7 @@ import StaffPage from "./pages/StaffPage";
 import ManagerPage from "./pages/ManagerPage";
 import AdminPage from "./pages/AdminPage";
 import ReportingPage from "./pages/ReportingPage";
+import NextBestCoursesPage from "./pages/NextBestCoursesPage";
 import { Box, Button, Paper, Typography } from "@mui/material";
 import { useAuth } from "./auth/AuthContext";
 
@@ -47,6 +48,7 @@ function App() {
           <Route index element={<Navigate to="/staff" replace />} />
           <Route path="staff" element={<StaffPage />} />
           <Route path="manager" element={<ManagerPage />} />
+          <Route path="next-best-courses" element={<NextBestCoursesPage />} />
           <Route path="admin" element={<AdminPage />} />
           <Route path="admin/reporting" element={<ReportingPage />} />
         </Route>

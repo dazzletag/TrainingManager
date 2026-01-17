@@ -5,7 +5,7 @@ info:
   description: >
     Evidence-centered REST API for the Mandatory Training & Competency platform.
 servers:
-  - url: http://localhost:4000/api/v1
+  - url: https://trainingmanager-backend.azurewebsites.net/api/v1
 paths:
   /staff/{personId}/requirements:
     get:

@@ -19,14 +19,15 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableSortLabel,
   TextField,
   Typography,
   CircularProgress,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence, fetchAdminUsers, upsertAdminUser, deleteAdminUser } from "../services/api";
+import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence, fetchAdminUsers, upsertAdminUser, deleteAdminUser, fetchRecommendationSettings, updateRecommendationSettings } from "../services/api";
 import { useUserContext } from "../context/UserContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
@@ -46,7 +47,19 @@ function AdminPage() {
     mandatory: true,
     requiredLevel: 1,
     category: "",
+    importanceLevel: 3,
+    minimumAttendees: 8,
+    enabled: true,
     roleExternalIds: [] as string[],
+  });
+  const [sortState, setSortState] = useState<{ key: string; direction: "asc" | "desc" }>({
+    key: "name",
+    direction: "asc",
+  });
+  const [recommendationForm, setRecommendationForm] = useState({
+    atRiskWindowDays: 60,
+    minimumAttendeesDefault: 8,
+    importanceWeightMultiplier: 2,
   });
 
   const trainingRequirementsQuery = useQuery({
@@ -62,6 +75,11 @@ function AdminPage() {
   const auditQuery = useQuery({
     queryKey: ["adminAudit", role],
     queryFn: () => fetchAuditTrail(role, userEmail).then((response) => response.data),
+  });
+
+  const recommendationSettingsQuery = useQuery({
+    queryKey: ["adminRecommendationSettings", role],
+    queryFn: () => fetchRecommendationSettings(role, userEmail).then((response) => response.data),
   });
 
   const atRiskQuery = useQuery({
@@ -99,6 +117,22 @@ function AdminPage() {
     onSuccess: () => accessQuery.refetch(),
   });
 
+  const updateRecommendationSettingsMutation = useMutation({
+    mutationFn: (payload: any) => updateRecommendationSettings(payload, role, userEmail),
+    onSuccess: () => recommendationSettingsQuery.refetch(),
+  });
+
+  useEffect(() => {
+    if (recommendationSettingsQuery.data?.settings) {
+      const settings = recommendationSettingsQuery.data.settings;
+      setRecommendationForm({
+        atRiskWindowDays: settings.atRiskWindowDays ?? 60,
+        minimumAttendeesDefault: settings.minimumAttendeesDefault ?? 8,
+        importanceWeightMultiplier: settings.importanceWeightMultiplier ?? 2,
+      });
+    }
+  }, [recommendationSettingsQuery.data]);
+
   const handleRoleSelection = (event: SelectChangeEvent<typeof formValues.roleExternalIds>) => {
     const { value } = event.target;
     setFormValues((prev) => ({
@@ -107,11 +141,62 @@ function AdminPage() {
     }));
   };
 
+  const sortedRequirements = [...(trainingRequirementsQuery.data?.requirements ?? [])].sort((a: any, b: any) => {
+    const { key, direction } = sortState;
+    const getValue = (item: any) => {
+      switch (key) {
+        case "name":
+          return String(item.name ?? "").toLowerCase();
+        case "validityPeriodMonths":
+          return Number(item.validityPeriodMonths ?? 0);
+        case "requiredLevel":
+          return Number(item.requiredLevel ?? 0);
+        case "category":
+          return String(item.category ?? "").toLowerCase();
+        case "importanceLevel":
+          return Number(item.importanceLevel ?? 0);
+        case "minimumAttendees":
+          return Number(item.minimumAttendees ?? 0);
+        case "enabled":
+          return item.enabled ? 1 : 0;
+        case "mandatory":
+          return item.mandatory ? 1 : 0;
+        default:
+          return String(item.name ?? "").toLowerCase();
+      }
+    };
+    const left = getValue(a);
+    const right = getValue(b);
+    if (left < right) return direction === "asc" ? -1 : 1;
+    if (left > right) return direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const handleSortChange = (key: string) => {
+    setSortState((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const renderSortLabel = (label: string, key: string) => (
+    <TableSortLabel
+      active={sortState.key === key}
+      direction={sortState.key === key ? sortState.direction : "asc"}
+      onClick={() => handleSortChange(key)}
+    >
+      {label}
+    </TableSortLabel>
+  );
+
   return (
     <Paper sx={{ p: 3 }}>
       <Typography variant="h6">Admin Workspace</Typography>
       <Tabs value={tabIndex} onChange={(_, value) => setTabIndex(value)} sx={{ mt: 2 }}>
         <Tab label="Requirements" />
+        <Tab label="Recommendations" />
         <Tab label="Evidence Overrides" />
         <Tab label="Audit Trail" />
         <Tab label="Access" />
@@ -125,17 +210,20 @@ function AdminPage() {
             <Table size="small" sx={{ mt: 1 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Validity (months)</TableCell>
-                  <TableCell>Level</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Mandatory</TableCell>
+                  <TableCell>{renderSortLabel("Name", "name")}</TableCell>
+                  <TableCell>{renderSortLabel("Validity (months)", "validityPeriodMonths")}</TableCell>
+                  <TableCell>{renderSortLabel("Level", "requiredLevel")}</TableCell>
+                  <TableCell>{renderSortLabel("Category", "category")}</TableCell>
+                  <TableCell>{renderSortLabel("Importance", "importanceLevel")}</TableCell>
+                  <TableCell>{renderSortLabel("Min attendees", "minimumAttendees")}</TableCell>
+                  <TableCell>{renderSortLabel("Enabled", "enabled")}</TableCell>
+                  <TableCell>{renderSortLabel("Mandatory", "mandatory")}</TableCell>
                   <TableCell>Roles</TableCell>
                   <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
-                {trainingRequirementsQuery.data.requirements.map((requirement: any) => (
+                {sortedRequirements.map((requirement: any) => (
                   <TableRow key={requirement.id}>
                     <TableCell>{requirement.name}</TableCell>
                     <TableCell>{requirement.validityPeriodMonths}</TableCell>
@@ -143,6 +231,9 @@ function AdminPage() {
                       {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
                     </TableCell>
                     <TableCell>{requirement.category ?? "-"}</TableCell>
+                    <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
+                    <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
+                    <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
                     <TableCell>{requirement.mandatory ? "Yes" : "No"}</TableCell>
                     <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
                     <TableCell>
@@ -157,6 +248,9 @@ function AdminPage() {
                             mandatory: requirement.mandatory ?? true,
                             requiredLevel: requirement.requiredLevel ?? 1,
                             category: requirement.category ?? "",
+                            importanceLevel: requirement.importanceLevel ?? 3,
+                            minimumAttendees: requirement.minimumAttendees ?? 8,
+                            enabled: requirement.enabled ?? true,
                             roleExternalIds: requirement.roles.map((role: any) => role.externalId),
                           });
                         }}
@@ -210,6 +304,28 @@ function AdminPage() {
                 }
               />
               <TextField
+                label="Importance level (1 low, 5 critical)"
+                fullWidth
+                size="small"
+                type="number"
+                inputProps={{ min: 1, max: 5 }}
+                value={formValues.importanceLevel}
+                onChange={(event) =>
+                  setFormValues((prev) => ({ ...prev, importanceLevel: Number(event.target.value) }))
+                }
+              />
+              <TextField
+                label="Minimum attendees"
+                fullWidth
+                size="small"
+                type="number"
+                inputProps={{ min: 1 }}
+                value={formValues.minimumAttendees}
+                onChange={(event) =>
+                  setFormValues((prev) => ({ ...prev, minimumAttendees: Number(event.target.value) }))
+                }
+              />
+              <TextField
                 label="Category (e.g. one-off)"
                 fullWidth
                 size="small"
@@ -234,6 +350,15 @@ function AdminPage() {
                   />
                 }
                 label="Mandatory"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formValues.enabled}
+                    onChange={(event) => setFormValues((prev) => ({ ...prev, enabled: event.target.checked }))}
+                  />
+                }
+                label="Enabled for recommendations"
               />
               <FormControl fullWidth size="small">
                 <Select
@@ -264,6 +389,9 @@ function AdminPage() {
                       mandatory: formValues.mandatory,
                       requiredLevel: formValues.requiredLevel,
                       category: formValues.category,
+                      importanceLevel: formValues.importanceLevel,
+                      minimumAttendees: formValues.minimumAttendees,
+                      enabled: formValues.enabled,
                       roleExternalIds: formValues.roleExternalIds,
                     };
                     if (editingId) {
@@ -287,6 +415,9 @@ function AdminPage() {
                         mandatory: true,
                         requiredLevel: 1,
                         category: "",
+                        importanceLevel: 3,
+                        minimumAttendees: 8,
+                        enabled: true,
                         roleExternalIds: [],
                       });
                     }}
@@ -304,6 +435,65 @@ function AdminPage() {
       )}
 
       {tabIndex === 1 && (
+        <Box mt={2}>
+          <Typography variant="subtitle1" gutterBottom>
+            Recommendation Settings
+          </Typography>
+          {recommendationSettingsQuery.isLoading && <CircularProgress size={24} />}
+          {recommendationSettingsQuery.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Unable to load recommendation settings
+            </Alert>
+          )}
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" } }}>
+            <TextField
+              label="At-risk window (days)"
+              type="number"
+              size="small"
+              inputProps={{ min: 1 }}
+              value={recommendationForm.atRiskWindowDays}
+              onChange={(event) =>
+                setRecommendationForm((prev) => ({ ...prev, atRiskWindowDays: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Default minimum attendees"
+              type="number"
+              size="small"
+              inputProps={{ min: 1 }}
+              value={recommendationForm.minimumAttendeesDefault}
+              onChange={(event) =>
+                setRecommendationForm((prev) => ({ ...prev, minimumAttendeesDefault: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Importance weight multiplier"
+              type="number"
+              size="small"
+              inputProps={{ min: 1 }}
+              value={recommendationForm.importanceWeightMultiplier}
+              onChange={(event) =>
+                setRecommendationForm((prev) => ({ ...prev, importanceWeightMultiplier: Number(event.target.value) }))
+              }
+            />
+          </Box>
+          <Box sx={{ mt: 2, display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              disabled={updateRecommendationSettingsMutation.status === "pending"}
+              onClick={() => updateRecommendationSettingsMutation.mutate(recommendationForm)}
+            >
+              Save settings
+            </Button>
+            {updateRecommendationSettingsMutation.isSuccess && <Alert severity="success">Settings updated</Alert>}
+            {updateRecommendationSettingsMutation.isError && (
+              <Alert severity="error">Unable to update recommendation settings</Alert>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {tabIndex === 2 && (
         <Box mt={2}>
           <Typography variant="subtitle1">Evidence Overrides</Typography>
           {approveMutation.isError && (
@@ -349,7 +539,7 @@ function AdminPage() {
         </Box>
       )}
 
-      {tabIndex === 2 && (
+      {tabIndex === 3 && (
         <Box mt={2}>
           <Typography variant="subtitle1">Audit Trail</Typography>
           {auditQuery.isLoading && <CircularProgress size={24} />}
@@ -371,7 +561,7 @@ function AdminPage() {
         </Box>
       )}
 
-      {tabIndex === 3 && (
+      {tabIndex === 4 && (
         <Box mt={2}>
           <Typography variant="subtitle1" gutterBottom>
             Access Management

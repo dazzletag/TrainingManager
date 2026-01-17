@@ -5,8 +5,10 @@ import { Role } from "../entities/Role";
 import { Evidence } from "../entities/Evidence";
 import { AuditLog } from "../entities/AuditLog";
 import { AppUser } from "../entities/AppUser";
+import { RecommendationSettings } from "../entities/RecommendationSettings";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
+import { coerceRecommendationSettings, getRecommendationSettings } from "../services/recommendationSettings";
 
 const router = Router();
 
@@ -86,7 +88,18 @@ router.get("/training-requirements", async (req, res) => {
 });
 
 router.post("/training-requirements", async (req, res) => {
-  const { name, description, validityPeriodMonths, mandatory, roleExternalIds, requiredLevel, category } = req.body;
+  const {
+    name,
+    description,
+    validityPeriodMonths,
+    mandatory,
+    roleExternalIds,
+    requiredLevel,
+    category,
+    importanceLevel,
+    minimumAttendees,
+    enabled,
+  } = req.body;
 
   if (!name || !description || !validityPeriodMonths) {
     return res.status(400).json({ message: "Name, description, and validity period are required" });
@@ -106,6 +119,9 @@ router.post("/training-requirements", async (req, res) => {
     mandatory: mandatory ?? true,
     requiredLevel: requiredLevel ?? (mandatory === false ? 2 : 1),
     category,
+    importanceLevel: importanceLevel ?? 3,
+    minimumAttendees: minimumAttendees ?? 8,
+    enabled: enabled ?? true,
     roles,
   });
 
@@ -122,7 +138,18 @@ router.post("/training-requirements", async (req, res) => {
 
 router.put("/training-requirements/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, description, validityPeriodMonths, mandatory, roleExternalIds, requiredLevel, category } = req.body;
+  const {
+    name,
+    description,
+    validityPeriodMonths,
+    mandatory,
+    roleExternalIds,
+    requiredLevel,
+    category,
+    importanceLevel,
+    minimumAttendees,
+    enabled,
+  } = req.body;
 
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
   const roleRepo = AppDataSource.getRepository(Role);
@@ -138,6 +165,9 @@ router.put("/training-requirements/:id", async (req, res) => {
   if (mandatory !== undefined) requirement.mandatory = Boolean(mandatory);
   if (requiredLevel !== undefined) requirement.requiredLevel = Number(requiredLevel);
   if (category !== undefined) requirement.category = category || null;
+  if (importanceLevel !== undefined) requirement.importanceLevel = Number(importanceLevel);
+  if (minimumAttendees !== undefined) requirement.minimumAttendees = Number(minimumAttendees);
+  if (enabled !== undefined) requirement.enabled = Boolean(enabled);
 
   if (Array.isArray(roleExternalIds)) {
     const roles = roleExternalIds.length
@@ -160,6 +190,20 @@ router.put("/training-requirements/:id", async (req, res) => {
 router.get("/audit", async (req, res) => {
   const logs = await AppDataSource.getRepository(AuditLog).find({ order: { createdAt: "DESC" } });
   res.json({ logs });
+});
+
+router.get("/recommendation-settings", async (_req, res) => {
+  const settings = await getRecommendationSettings();
+  res.json({ settings });
+});
+
+router.put("/recommendation-settings", async (req, res) => {
+  const repo = AppDataSource.getRepository(RecommendationSettings);
+  const settings = await getRecommendationSettings();
+  const updates = coerceRecommendationSettings(req.body ?? {});
+  const merged = repo.merge(settings, updates);
+  const saved = await repo.save(merged);
+  res.json({ settings: saved });
 });
 
 router.post("/evidence/:evidenceId/approve", async (req, res) => {

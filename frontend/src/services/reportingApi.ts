@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const REPORTING_BASE_URL =
-  import.meta.env.VITE_REPORTING_BASE_URL ?? "http://localhost:7071/api";
+  import.meta.env.VITE_REPORTING_BASE_URL ?? "https://trainingmanager-reporting.azurewebsites.net/api";
 
 const reportingClient = axios.create({
   baseURL: REPORTING_BASE_URL,

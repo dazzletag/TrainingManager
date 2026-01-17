@@ -26,6 +26,15 @@ export class TrainingRequirement {
   @Column("int", { default: 1 })
   requiredLevel!: number;
 
+  @Column("int", { default: 3 })
+  importanceLevel!: number;
+
+  @Column("int", { default: 8 })
+  minimumAttendees!: number;
+
+  @Column({ default: true })
+  enabled!: boolean;
+
   @Column({ default: true })
   mandatory!: boolean;
 
