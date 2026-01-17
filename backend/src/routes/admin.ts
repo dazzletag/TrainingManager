@@ -92,7 +92,6 @@ router.post("/training-requirements", async (req, res) => {
     name,
     description,
     validityPeriodMonths,
-    mandatory,
     roleExternalIds,
     requiredLevel,
     category,
@@ -116,8 +115,7 @@ router.post("/training-requirements", async (req, res) => {
     name,
     description,
     validityPeriodMonths,
-    mandatory: mandatory ?? true,
-    requiredLevel: requiredLevel ?? (mandatory === false ? 2 : 1),
+    requiredLevel: requiredLevel ?? 1,
     category,
     importanceLevel: importanceLevel ?? 3,
     minimumAttendees: minimumAttendees ?? 8,
@@ -142,7 +140,6 @@ router.put("/training-requirements/:id", async (req, res) => {
     name,
     description,
     validityPeriodMonths,
-    mandatory,
     roleExternalIds,
     requiredLevel,
     category,
@@ -162,7 +159,6 @@ router.put("/training-requirements/:id", async (req, res) => {
   if (name !== undefined) requirement.name = name;
   if (description !== undefined) requirement.description = description;
   if (validityPeriodMonths !== undefined) requirement.validityPeriodMonths = Number(validityPeriodMonths);
-  if (mandatory !== undefined) requirement.mandatory = Boolean(mandatory);
   if (requiredLevel !== undefined) requirement.requiredLevel = Number(requiredLevel);
   if (category !== undefined) requirement.category = category || null;
   if (importanceLevel !== undefined) requirement.importanceLevel = Number(importanceLevel);

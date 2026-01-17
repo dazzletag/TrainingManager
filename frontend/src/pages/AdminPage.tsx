@@ -44,7 +44,6 @@ function AdminPage() {
     name: "",
     description: "",
     validityPeriodMonths: 12,
-    mandatory: true,
     requiredLevel: 1,
     category: "",
     importanceLevel: 3,
@@ -159,8 +158,6 @@ function AdminPage() {
           return Number(item.minimumAttendees ?? 0);
         case "enabled":
           return item.enabled ? 1 : 0;
-        case "mandatory":
-          return item.mandatory ? 1 : 0;
         default:
           return String(item.name ?? "").toLowerCase();
       }
@@ -240,7 +237,6 @@ function AdminPage() {
                   <TableCell>{renderSortLabel("Importance", "importanceLevel")}</TableCell>
                   <TableCell>{renderSortLabel("Min attendees", "minimumAttendees")}</TableCell>
                   <TableCell>{renderSortLabel("Enabled", "enabled")}</TableCell>
-                  <TableCell>{renderSortLabel("Mandatory", "mandatory")}</TableCell>
                   <TableCell>Roles</TableCell>
                   <TableCell />
                 </TableRow>
@@ -249,7 +245,7 @@ function AdminPage() {
                 {requirementGroups.map((group) => (
                   <Fragment key={group.label}>
                     <TableRow>
-                      <TableCell colSpan={10} sx={{ bgcolor: "rgba(15, 98, 254, 0.08)" }}>
+                      <TableCell colSpan={9} sx={{ bgcolor: "rgba(15, 98, 254, 0.08)" }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                           {group.label}
                         </Typography>
@@ -266,7 +262,6 @@ function AdminPage() {
                         <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
                         <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
                         <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
-                        <TableCell>{requirement.mandatory ? "Yes" : "No"}</TableCell>
                         <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
                         <TableCell>
                           <Button
@@ -277,7 +272,6 @@ function AdminPage() {
                                 name: requirement.name ?? "",
                                 description: requirement.description ?? "",
                                 validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
-                                mandatory: requirement.mandatory ?? true,
                                 requiredLevel: requirement.requiredLevel ?? 1,
                                 category: requirement.category ?? "",
                                 importanceLevel: requirement.importanceLevel ?? 3,
@@ -294,7 +288,7 @@ function AdminPage() {
                     ))}
                     {!group.items.length && (
                       <TableRow>
-                        <TableCell colSpan={10} sx={{ color: "text.secondary" }}>
+                        <TableCell colSpan={9} sx={{ color: "text.secondary" }}>
                           No courses in this section.
                         </TableCell>
                       </TableRow>
@@ -386,15 +380,6 @@ function AdminPage() {
               <FormControlLabel
                 control={
                   <Switch
-                    checked={formValues.mandatory}
-                    onChange={(event) => setFormValues((prev) => ({ ...prev, mandatory: event.target.checked }))}
-                  />
-                }
-                label="Mandatory"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
                     checked={formValues.enabled}
                     onChange={(event) => setFormValues((prev) => ({ ...prev, enabled: event.target.checked }))}
                   />
@@ -427,7 +412,6 @@ function AdminPage() {
                       name: formValues.name,
                       description: formValues.description,
                       validityPeriodMonths: formValues.validityPeriodMonths,
-                      mandatory: formValues.mandatory,
                       requiredLevel: formValues.requiredLevel,
                       category: formValues.category,
                       importanceLevel: formValues.importanceLevel,
@@ -453,7 +437,6 @@ function AdminPage() {
                         name: "",
                         description: "",
                         validityPeriodMonths: 12,
-                        mandatory: true,
                         requiredLevel: 1,
                         category: "",
                         importanceLevel: 3,

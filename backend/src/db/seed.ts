@@ -39,21 +39,18 @@ async function seed(): Promise<void> {
         name: "First Aid",
         description: "Basic emergency first aid training",
         validityPeriodMonths: 24,
-        mandatory: true,
         roles: [careRole, nurseRole],
       }),
       requirementRepo.create({
         name: "Safeguarding Adults",
         description: "Adults safeguarding with scenario work",
         validityPeriodMonths: 12,
-        mandatory: true,
         roles: [careRole, nurseRole],
       }),
       requirementRepo.create({
         name: "Equality & Diversity",
         description: "Values-based equality and inclusion training",
         validityPeriodMonths: 12,
-        mandatory: true,
         roles: [adminRole, nurseRole, careRole],
       }),
     ]);

@@ -136,22 +136,21 @@ function fallbackRecommend(employees: RecommendInput[]): RecommendInput[] {
 
 function resolveRequirementMeta(
   requirement: TrainingRequirement,
-  groupMeta?: { requiredLevel: number; mandatory: boolean },
+  groupMeta?: { requiredLevel: number },
 ): TrainingRequirement {
   if (!groupMeta) {
     return requirement;
   }
   return Object.assign({}, requirement, {
     requiredLevel: groupMeta.requiredLevel,
-    mandatory: groupMeta.mandatory,
   });
 }
 
 function mergeRequirementMetaForPerson(
   groupIds: string[],
-  metaByRoleId: Map<string, { requiredLevel: number; mandatory: boolean }>,
+  metaByRoleId: Map<string, { requiredLevel: number }>,
 ) {
-  let merged: { requiredLevel: number; mandatory: boolean } | undefined;
+  let merged: { requiredLevel: number } | undefined;
   for (const groupId of groupIds) {
     const meta = metaByRoleId.get(groupId);
     if (!meta) continue;
@@ -161,7 +160,6 @@ function mergeRequirementMetaForPerson(
     }
     merged = {
       requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
-      mandatory: merged.mandatory || meta.mandatory,
     };
   }
   return merged;
@@ -171,7 +169,7 @@ function summarizeCompliance(
   person: Person,
   requirement: TrainingRequirement,
   assignment: Assignment | undefined,
-  metaByRoleId: Map<string, { requiredLevel: number; mandatory: boolean }>,
+  metaByRoleId: Map<string, { requiredLevel: number }>,
 ) {
   const groupIds = person.groups?.map((group) => group.id) ?? [];
   const requirementMeta = mergeRequirementMetaForPerson(groupIds, metaByRoleId);
@@ -263,7 +261,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
       })
     : [];
   const metaByRoleId = new Map(
-    groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+    groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel }]),
   );
 
   const assignedPersonIds = new Set(

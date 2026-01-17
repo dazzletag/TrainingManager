@@ -11,33 +11,31 @@ const router = Router();
 
 function resolveRequirementMeta(
   requirement: TrainingRequirement,
-  groupMeta?: { requiredLevel: number; mandatory: boolean },
+  groupMeta?: { requiredLevel: number },
 ): TrainingRequirement {
   if (!groupMeta) {
     return requirement;
   }
   return Object.assign({}, requirement, {
     requiredLevel: groupMeta.requiredLevel,
-    mandatory: groupMeta.mandatory,
   });
 }
 
 async function buildRequirementMetaByGroup(groupIds: string[]) {
   if (!groupIds.length) {
-    return new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
+    return new Map<string, Map<string, { requiredLevel: number }>>();
   }
   const repo = AppDataSource.getRepository(TrainingRequirementGroup);
   const links = await repo.find({
     where: { roleId: In(groupIds) },
   });
-  const byGroup = new Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>();
+  const byGroup = new Map<string, Map<string, { requiredLevel: number }>>();
   for (const link of links) {
     if (!byGroup.has(link.roleId)) {
       byGroup.set(link.roleId, new Map());
     }
     byGroup.get(link.roleId)!.set(link.requirementId, {
       requiredLevel: link.requiredLevel,
-      mandatory: link.mandatory,
     });
   }
   return byGroup;
@@ -45,9 +43,9 @@ async function buildRequirementMetaByGroup(groupIds: string[]) {
 
 function mergeGroupRequirementMeta(
   groupIds: string[],
-  byGroup: Map<string, Map<string, { requiredLevel: number; mandatory: boolean }>>,
+  byGroup: Map<string, Map<string, { requiredLevel: number }>>,
 ) {
-  const metaMap = new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  const metaMap = new Map<string, { requiredLevel: number }>();
   for (const groupId of groupIds) {
     const groupMap = byGroup.get(groupId);
     if (!groupMap) continue;
@@ -59,7 +57,6 @@ function mergeGroupRequirementMeta(
       }
       metaMap.set(requirementId, {
         requiredLevel: Math.min(existing.requiredLevel, meta.requiredLevel),
-        mandatory: existing.mandatory || meta.mandatory,
       });
     }
   }
@@ -100,7 +97,7 @@ router.get("/compliance", async (req, res) => {
         })
       : [];
     const metaByRoleId = new Map(
-      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel }]),
     );
 
     const assignmentMap = new Map(assignments.map((assignment) => [assignment.person.id, assignment]));
@@ -108,7 +105,7 @@ router.get("/compliance", async (req, res) => {
 
     for (const person of people) {
       const groupIdsForPerson = person.groups?.map((group) => group.id) ?? [];
-      let merged: { requiredLevel: number; mandatory: boolean } | undefined;
+      let merged: { requiredLevel: number } | undefined;
       for (const groupId of groupIdsForPerson) {
         const meta = metaByRoleId.get(groupId);
         if (!meta) continue;
@@ -117,14 +114,12 @@ router.get("/compliance", async (req, res) => {
         } else {
           merged = {
             requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
-            mandatory: merged.mandatory || meta.mandatory,
           };
         }
       }
       const resolvedRequirement = merged
         ? Object.assign({}, requirement, {
             requiredLevel: merged.requiredLevel,
-            mandatory: merged.mandatory,
           })
         : requirement;
       const result = evaluateRequirement(resolvedRequirement, assignmentMap.get(person.id));
@@ -263,7 +258,7 @@ router.get("/at-risk", async (req, res) => {
         })
       : [];
     const metaByRoleId = new Map(
-      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel, mandatory: link.mandatory }]),
+      groupLinks.map((link) => [link.roleId, { requiredLevel: link.requiredLevel }]),
     );
 
     const assignmentMap = new Map(assignments.map((assignment) => [assignment.person.id, assignment]));
@@ -271,7 +266,7 @@ router.get("/at-risk", async (req, res) => {
 
     for (const person of people) {
       const groupIdsForPerson = person.groups?.map((group) => group.id) ?? [];
-      let merged: { requiredLevel: number; mandatory: boolean } | undefined;
+      let merged: { requiredLevel: number } | undefined;
       for (const groupId of groupIdsForPerson) {
         const meta = metaByRoleId.get(groupId);
         if (!meta) continue;
@@ -280,14 +275,12 @@ router.get("/at-risk", async (req, res) => {
         } else {
           merged = {
             requiredLevel: Math.min(merged.requiredLevel, meta.requiredLevel),
-            mandatory: merged.mandatory || meta.mandatory,
           };
         }
       }
       const resolvedRequirement = merged
         ? Object.assign({}, requirement, {
             requiredLevel: merged.requiredLevel,
-            mandatory: merged.mandatory,
           })
         : requirement;
       const result = evaluateRequirement(resolvedRequirement, assignmentMap.get(person.id));

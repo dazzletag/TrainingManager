@@ -35,9 +35,6 @@ export class TrainingRequirement {
   @Column({ default: true })
   enabled!: boolean;
 
-  @Column({ default: true })
-  mandatory!: boolean;
-
   @Column({ nullable: true })
   category?: string;
 

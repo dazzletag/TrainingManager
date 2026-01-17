@@ -102,7 +102,7 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
     );
 
     const nextGroupLinks = await request.query(
-      "SELECT roleId, requiredLevel, mandatory FROM training_requirement_group WHERE requirementId = @nextId",
+      "SELECT roleId, requiredLevel FROM training_requirement_group WHERE requirementId = @nextId",
     );
     for (const link of nextGroupLinks.recordset) {
       const check = new sql.Request(transaction);
@@ -110,7 +110,7 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
         .input("baseId", sql.UniqueIdentifier, baseRequirement.id)
         .input("roleId", sql.UniqueIdentifier, link.roleId);
       const existing = await check.query(
-        "SELECT requiredLevel, mandatory FROM training_requirement_group WHERE requirementId = @baseId AND roleId = @roleId",
+        "SELECT requiredLevel FROM training_requirement_group WHERE requirementId = @baseId AND roleId = @roleId",
       );
       if (!existing.recordset.length) {
         const insertGroup = new sql.Request(transaction);
@@ -118,10 +118,9 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
           .input("id", sql.UniqueIdentifier, crypto.randomUUID())
           .input("baseId", sql.UniqueIdentifier, baseRequirement.id)
           .input("roleId", sql.UniqueIdentifier, link.roleId)
-          .input("requiredLevel", sql.Int, link.requiredLevel ?? 0)
-          .input("mandatory", sql.Bit, link.mandatory ? 1 : 0);
+          .input("requiredLevel", sql.Int, link.requiredLevel ?? 0);
         await insertGroup.query(
-          "INSERT INTO training_requirement_group (id, requirementId, roleId, requiredLevel, mandatory, createdAt, updatedAt) VALUES (@id, @baseId, @roleId, @requiredLevel, @mandatory, GETUTCDATE(), GETUTCDATE())",
+          "INSERT INTO training_requirement_group (id, requirementId, roleId, requiredLevel, createdAt, updatedAt) VALUES (@id, @baseId, @roleId, @requiredLevel, GETUTCDATE(), GETUTCDATE())",
         );
       } else {
         const existingRow = existing.recordset[0];
@@ -129,14 +128,9 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
         updateGroup
           .input("baseId", sql.UniqueIdentifier, baseRequirement.id)
           .input("roleId", sql.UniqueIdentifier, link.roleId)
-          .input("requiredLevel", sql.Int, maxNumber(existingRow.requiredLevel, link.requiredLevel))
-          .input(
-            "mandatory",
-            sql.Bit,
-            existingRow.mandatory && link.mandatory ? 1 : 0,
-          );
+          .input("requiredLevel", sql.Int, maxNumber(existingRow.requiredLevel, link.requiredLevel));
         await updateGroup.query(
-          "UPDATE training_requirement_group SET requiredLevel = @requiredLevel, mandatory = @mandatory, updatedAt = GETUTCDATE() WHERE requirementId = @baseId AND roleId = @roleId",
+          "UPDATE training_requirement_group SET requiredLevel = @requiredLevel, updatedAt = GETUTCDATE() WHERE requirementId = @baseId AND roleId = @roleId",
         );
       }
     }
@@ -162,11 +156,6 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
       )
       .input("category", sql.NVarChar, baseRequirement.category ?? nextRequirement.category ?? null)
       .input(
-        "mandatory",
-        sql.Bit,
-        baseRequirement.mandatory && nextRequirement.mandatory ? 1 : 0,
-      )
-      .input(
         "importanceLevel",
         sql.Int,
         maxNumber(baseRequirement.importanceLevel, nextRequirement.importanceLevel),
@@ -182,7 +171,6 @@ async function mergeRequirement(pool, baseRequirement, nextRequirement) {
        SET validityPeriodMonths = @validityPeriodMonths,
            requiredLevel = @requiredLevel,
            category = @category,
-           mandatory = @mandatory,
            importanceLevel = @importanceLevel,
            minimumAttendees = @minimumAttendees,
            enabled = @enabled,
@@ -210,7 +198,7 @@ async function main() {
   }
   const pool = await sql.connect(config);
   const requirementsResult = await pool.request().query(
-    "SELECT id, name, validityPeriodMonths, requiredLevel, category, importanceLevel, minimumAttendees, enabled, mandatory FROM training_requirement",
+    "SELECT id, name, validityPeriodMonths, requiredLevel, category, importanceLevel, minimumAttendees, enabled FROM training_requirement",
   );
 
   const requirements = requirementsResult.recordset;

@@ -20,7 +20,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'overdue' THEN 1 ELSE 0 END) AS overdue,
         SUM(CASE WHEN complianceStatus = 'missing' THEN 1 ELSE 0 END) AS missing
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY homeLocation
       ORDER BY homeLocation
       OPTION (RECOMPILE)
@@ -37,7 +37,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'compliant' THEN 1 ELSE 0 END) AS compliant,
         SUM(CASE WHEN complianceStatus = 'overdue' THEN 1 ELSE 0 END) AS overdue
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY roleName, roleCategory
       ORDER BY roleName
       OPTION (RECOMPILE)
@@ -54,7 +54,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'compliant' THEN 1 ELSE 0 END) AS compliant,
         SUM(CASE WHEN complianceStatus = 'overdue' THEN 1 ELSE 0 END) AS overdue
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY requirementName, requiredLevel
       ORDER BY requirementName
       OPTION (RECOMPILE)
@@ -66,7 +66,7 @@ module.exports = async function (context, req) {
       `
       SELECT DISTINCT homeLocation AS home
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE requiredLevel = 1
       ORDER BY homeLocation
       `,
     );
@@ -75,7 +75,7 @@ module.exports = async function (context, req) {
       `
       SELECT DISTINCT roleName
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE requiredLevel = 1
       ORDER BY roleName
       `,
     );
@@ -84,7 +84,7 @@ module.exports = async function (context, req) {
       `
       SELECT DISTINCT requiredLevel
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
+      WHERE requiredLevel = 1
       ORDER BY requiredLevel
       `,
     );

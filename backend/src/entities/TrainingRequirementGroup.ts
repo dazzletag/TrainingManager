@@ -34,9 +34,6 @@ export class TrainingRequirementGroup {
   @Column("int")
   requiredLevel!: number;
 
-  @Column("bit")
-  mandatory!: boolean;
-
   @CreateDateColumn()
   createdAt!: Date;
 

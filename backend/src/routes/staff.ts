@@ -13,38 +13,35 @@ const router = Router();
 
 function resolveRequirementMeta(
   requirement: TrainingRequirement,
-  groupMeta?: { requiredLevel: number; mandatory: boolean },
+  groupMeta?: { requiredLevel: number },
 ): TrainingRequirement {
   if (!groupMeta) {
     return requirement;
   }
   return Object.assign({}, requirement, {
     requiredLevel: groupMeta.requiredLevel,
-    mandatory: groupMeta.mandatory,
   });
 }
 
 async function buildRequirementMetaMap(groupIds: string[]) {
   if (!groupIds.length) {
-    return new Map<string, { requiredLevel: number; mandatory: boolean }>();
+    return new Map<string, { requiredLevel: number }>();
   }
   const repo = AppDataSource.getRepository(TrainingRequirementGroup);
   const links = await repo.find({
     where: { roleId: In(groupIds) },
   });
-  const metaMap = new Map<string, { requiredLevel: number; mandatory: boolean }>();
+  const metaMap = new Map<string, { requiredLevel: number }>();
   for (const link of links) {
     const existing = metaMap.get(link.requirementId);
     if (!existing) {
       metaMap.set(link.requirementId, {
         requiredLevel: link.requiredLevel,
-        mandatory: link.mandatory,
       });
       continue;
     }
     metaMap.set(link.requirementId, {
       requiredLevel: Math.min(existing.requiredLevel, link.requiredLevel),
-      mandatory: existing.mandatory || link.mandatory,
     });
   }
   return metaMap;

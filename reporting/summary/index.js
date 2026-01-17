@@ -22,7 +22,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'due_90' THEN 1 ELSE 0 END) AS due90Count,
         AVG(CASE WHEN complianceStatus = 'overdue' THEN CAST(daysOverdue AS float) END) AS avgDaysLate
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       OPTION (RECOMPILE)
       `,
       params,
@@ -36,7 +36,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'compliant' THEN 1 ELSE 0 END) AS compliant,
         SUM(CASE WHEN complianceStatus IN ('overdue', 'due_30') THEN 1 ELSE 0 END) AS atRisk
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY homeLocation
       OPTION (RECOMPILE)
       `,
@@ -85,7 +85,7 @@ module.exports = async function (context, req) {
         SUM(CASE WHEN complianceStatus = 'overdue' THEN 1 ELSE 0 END) AS overdueCount,
         AVG(CASE WHEN complianceStatus = 'overdue' THEN CAST(daysOverdue AS float) END) AS avgDaysLate
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY requirementName, requiredLevel
       ORDER BY overdueCount DESC, avgDaysLate DESC
       OPTION (RECOMPILE)
@@ -99,7 +99,7 @@ module.exports = async function (context, req) {
         homeLocation AS home,
         COUNT(DISTINCT personId) AS totalPeople
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY homeLocation
       ORDER BY homeLocation
       OPTION (RECOMPILE)
@@ -113,7 +113,7 @@ module.exports = async function (context, req) {
         roleCategory AS roleType,
         COUNT(DISTINCT personId) AS totalPeople
       FROM vw_training_compliance_current
-      WHERE mandatory = 1${clause}
+      WHERE requiredLevel = 1${clause}
       GROUP BY roleCategory
       ORDER BY roleCategory
       OPTION (RECOMPILE)

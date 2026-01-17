@@ -445,28 +445,28 @@ export default function ReportingPage() {
           }}
         >
           <KpiCard
-            label="Compliance (Mandatory)"
+            label="Compliance (Essential)"
             value={`${summary.complianceRate}%`}
             accent="#1b5e20"
-            description="Share of mandatory assignments currently compliant."
+            description="Share of essential assignments currently compliant."
           />
           <KpiCard
             label="Overdue"
             value={formatValue(Number(summary.totals.overdue ?? 0), totalAssignments)}
             accent="#b71c1c"
-            description="Mandatory assignments past their due date."
+            description="Essential assignments past their due date."
           />
           <KpiCard
             label="Due in 30 Days"
             value={formatValue(Number(summary.totals.due30 ?? 0), totalAssignments)}
             accent="#f57c00"
-            description="Mandatory assignments due within the next 30 days."
+            description="Essential assignments due within the next 30 days."
           />
           <KpiCard
             label="Avg Days Late"
             value={String(summary.totals.avgDaysLate ?? 0)}
             accent="#6a1b9a"
-            description="Average days overdue for mandatory training."
+            description="Average days overdue for essential training."
           />
         </Box>
       )}
@@ -480,7 +480,7 @@ export default function ReportingPage() {
       >
         <ChartCard
           title="Risk Heatmap by Home"
-          description="Shows mandatory compliance percentage by home. Use this to spot homes that are drifting below target."
+          description="Shows essential compliance percentage by home. Use this to spot homes that are drifting below target."
         >
           <Suspense fallback={<Skeleton height={260} />}>
             <ReactECharts
@@ -761,7 +761,7 @@ export default function ReportingPage() {
       >
         <ChartCard
           title="Training Distribution by Home"
-          description="Share of staff with mandatory assignments by home. Use to validate balanced coverage."
+          description="Share of staff with essential assignments by home. Use to validate balanced coverage."
         >
           <Suspense fallback={<Skeleton height={240} />}>
             <ReactECharts
@@ -788,7 +788,7 @@ export default function ReportingPage() {
         </ChartCard>
         <ChartCard
           title="Training Distribution by Role Type"
-          description="Share of mandatory training coverage by role category (care vs ancillary)."
+          description="Share of essential training coverage by role category (care vs ancillary)."
         >
           <Suspense fallback={<Skeleton height={240} />}>
             <ReactECharts
@@ -850,7 +850,7 @@ export default function ReportingPage() {
         </ChartCard>
         <ChartCard
           title="Compliance by Employee Group"
-          description="Mandatory compliance percentage by employee group. Use for targeted performance actions."
+          description="Essential compliance percentage by employee group. Use for targeted performance actions."
         >
           <Suspense fallback={<Skeleton height={220} />}>
             <ReactECharts

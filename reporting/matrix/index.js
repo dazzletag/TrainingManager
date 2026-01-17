@@ -67,8 +67,7 @@ module.exports = async function (context, req) {
         nextDueDate,
         complianceStatus
       FROM vw_training_compliance_current
-      WHERE mandatory = 1
-        AND requiredLevel = 1
+      WHERE requiredLevel = 1
         AND UPPER(requirementName) LIKE '%SCTV%'${clause}
       ORDER BY fullName, requirementName
       OPTION (RECOMPILE)
