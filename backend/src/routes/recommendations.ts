@@ -44,7 +44,9 @@ router.get("/next-courses", async (_req, res) => {
     INNER JOIN training_requirement tr ON tr.id = cs.courseId
     WHERE tr.enabled = 1
       AND tr.name NOT LIKE '%SCTV%'
-      AND tr.name NOT LIKE '%Competency%';
+      AND tr.name NOT LIKE '%Competency%'
+      AND tr.name NOT LIKE '%Induction%'
+      AND tr.name NOT LIKE '%Flu Vaccine%';
   `);
 
   const recommendations = rows
