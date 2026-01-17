@@ -49,6 +49,12 @@ router.get("/next-courses", async (req, res) => {
       AND tr.name NOT LIKE '%Competency%'
       AND tr.name NOT LIKE '%Induction%'
       AND tr.name NOT LIKE '%Flu Vaccine%'
+      AND tr.name <> 'Fire Drill'
+      AND tr.name <> 'Level 2 Adult Care'
+      AND tr.name <> 'Most Recent Flu Vaccination'
+      AND tr.name <> 'Care Certificate'
+      AND tr.name <> 'Mandatory Training'
+      AND tr.name <> 'Level 3 Lead Adult Care'
       ${requiredLevelFilter ? "AND tr.requiredLevel = " + requiredLevelFilter : ""};
   `);
 
