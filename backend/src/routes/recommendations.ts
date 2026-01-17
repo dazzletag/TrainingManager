@@ -19,10 +19,10 @@ router.get("/next-courses", async (_req, res) => {
     WITH course_status AS (
       SELECT
         ets.courseId,
-        SUM(CASE WHEN ets.status = 'Expired' THEN 1 ELSE 0 END) AS expiredCount,
-        SUM(CASE WHEN ets.status = 'AtRisk' THEN 1 ELSE 0 END) AS atRiskCount,
-        SUM(CASE WHEN ets.status IN ('Expired', 'AtRisk') THEN 1 ELSE 0 END) AS eligibleCount,
-        SUM(CASE WHEN ets.expiryDate IS NULL THEN 1 ELSE 0 END) AS missingCount,
+        COUNT(DISTINCT CASE WHEN ets.status = 'Expired' THEN ets.employeeId END) AS expiredCount,
+        COUNT(DISTINCT CASE WHEN ets.status = 'AtRisk' THEN ets.employeeId END) AS atRiskCount,
+        COUNT(DISTINCT CASE WHEN ets.status IN ('Expired', 'AtRisk') THEN ets.employeeId END) AS eligibleCount,
+        COUNT(DISTINCT CASE WHEN ets.expiryDate IS NULL THEN ets.employeeId END) AS missingCount,
         AVG(CAST(ets.daysToExpiry AS float)) AS averageDaysToExpiry
       FROM vw_employee_training_status ets
       INNER JOIN person p ON p.id = ets.employeeId
