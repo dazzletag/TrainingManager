@@ -329,7 +329,7 @@ function TrainingSessionBuilder() {
       if (removedPersonId !== null) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
-          next.add(removedPersonId);
+          next.add(removedPersonId as string);
           return next;
         });
       }
@@ -345,7 +345,7 @@ function TrainingSessionBuilder() {
       if (context?.personId !== null && context?.personId !== undefined) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
-          next.delete(context.personId);
+          next.delete(context.personId as string);
           return next;
         });
       }
