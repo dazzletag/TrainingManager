@@ -326,7 +326,7 @@ function TrainingSessionBuilder() {
         unassigned: updatedUnassigned,
       });
 
-      if (removedPersonId) {
+      if (removedPersonId !== null) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
           next.add(removedPersonId);
@@ -342,7 +342,7 @@ function TrainingSessionBuilder() {
       }
     },
     onSettled: (_data, _error, _payload, context) => {
-      if (context?.personId) {
+      if (context?.personId !== null && context?.personId !== undefined) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
           next.delete(context.personId);
