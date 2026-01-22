@@ -96,6 +96,11 @@ type PublishFeedback = {
   publishedAt: string;
 };
 
+type SchedulerOverviewData = {
+  overview: SessionOverview[];
+  unassigned: UnassignedPerson[];
+};
+
 const homePalette = ["#e3f2fd", "#f3e5f5", "#e8f5e9", "#fff3e0", "#fbe9e7"];
 const homeColorOverrides: Record<string, string> = {
   "7653": "#CFE0B4",
@@ -109,6 +114,7 @@ const getHomeKey = (person: { primaryDepartmentId?: string; home?: string }) =>
 function TrainingSessionBuilder() {
   const { role, userEmail } = useUserContext();
   const queryClient = useQueryClient();
+  const overviewKey = ["schedulerOverview", role];
   const [form, setForm] = useState({
     name: "",
     type: "Mandatory Training",
@@ -126,7 +132,7 @@ function TrainingSessionBuilder() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const overviewQuery = useQuery({
-    queryKey: ["schedulerOverview", role],
+    queryKey: overviewKey,
     queryFn: () => fetchSchedulerOverview(role, userEmail).then((response) => response.data),
   });
 
@@ -136,12 +142,168 @@ function TrainingSessionBuilder() {
   const assignMutation = useMutation({
     mutationFn: (payload: { sessionId: string; personId: string; day: number; dropZoneId: string }) =>
       assignPersonToSession(payload, role, userEmail),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] }),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: overviewKey });
+      const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
+      if (!previous) {
+        return { previous };
+      }
+
+      const personFromUnassigned = previous.unassigned.find((person) => person.id === payload.personId);
+      let assignmentPerson: SessionAssignment["person"] | null = null;
+
+      if (personFromUnassigned) {
+        assignmentPerson = {
+          id: personFromUnassigned.id,
+          externalId: personFromUnassigned.externalId,
+          name: personFromUnassigned.name,
+          email: "",
+          role: personFromUnassigned.role,
+          home: personFromUnassigned.home,
+          primaryDepartmentId: personFromUnassigned.primaryDepartmentId,
+          status: personFromUnassigned.status,
+          nextDue: personFromUnassigned.nextDue,
+          lastTrainingAt: personFromUnassigned.lastTrainingAt,
+        };
+      } else {
+        for (const session of previous.overview) {
+          const assignment = [...session.day1Assignments, ...session.day2Assignments].find(
+            (entry) => entry.person.id === payload.personId,
+          );
+          if (assignment) {
+            assignmentPerson = assignment.person;
+            break;
+          }
+        }
+      }
+
+      if (!assignmentPerson) {
+        return { previous };
+      }
+
+      const optimisticIdBase = `optimistic-${payload.sessionId}-${payload.personId}-${Date.now()}`;
+      const day1Assignment: SessionAssignment = {
+        id: `${optimisticIdBase}-day-1`,
+        dropZoneId: `${optimisticIdBase}-drop-day-1`,
+        person: assignmentPerson,
+      };
+      const day2Assignment: SessionAssignment = {
+        id: `${optimisticIdBase}-day-2`,
+        dropZoneId: `${optimisticIdBase}-drop-day-2`,
+        person: assignmentPerson,
+      };
+
+      const updatedOverview = previous.overview.map((session) => {
+        const filteredDay1 = session.day1Assignments.filter(
+          (assignment) => assignment.person.id !== payload.personId,
+        );
+        const filteredDay2 = session.day2Assignments.filter(
+          (assignment) => assignment.person.id !== payload.personId,
+        );
+
+        if (session.id !== payload.sessionId) {
+          return {
+            ...session,
+            day1Assignments: filteredDay1,
+            day2Assignments: filteredDay2,
+          };
+        }
+
+        return {
+          ...session,
+          day1Assignments: [day1Assignment, ...filteredDay1],
+          day2Assignments: [day2Assignment, ...filteredDay2],
+        };
+      });
+
+      const updatedUnassigned = previous.unassigned.filter((person) => person.id !== payload.personId);
+
+      queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
+        overview: updatedOverview,
+        unassigned: updatedUnassigned,
+      });
+
+      return { previous };
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(overviewKey, context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: overviewKey }),
   });
 
   const removeMutation = useMutation({
     mutationFn: (assignmentId: string) => removeSessionAssignment(assignmentId, role, userEmail),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] }),
+    onMutate: async (assignmentId) => {
+      await queryClient.cancelQueries({ queryKey: overviewKey });
+      const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
+      if (!previous) {
+        return { previous };
+      }
+
+      let removedPerson: SessionAssignment["person"] | null = null;
+      const updatedOverview = previous.overview.map((session) => {
+        const nextDay1 = session.day1Assignments.filter((assignment) => {
+          if (assignment.id === assignmentId) {
+            removedPerson = assignment.person;
+            return false;
+          }
+          return true;
+        });
+        const nextDay2 = session.day2Assignments.filter((assignment) => {
+          if (assignment.id === assignmentId) {
+            removedPerson = assignment.person;
+            return false;
+          }
+          return true;
+        });
+        return {
+          ...session,
+          day1Assignments: nextDay1,
+          day2Assignments: nextDay2,
+        };
+      });
+
+      let updatedUnassigned = previous.unassigned;
+      if (removedPerson) {
+        const stillAssigned = updatedOverview.some((session) =>
+          [...session.day1Assignments, ...session.day2Assignments].some(
+            (assignment) => assignment.person.id === removedPerson?.id,
+          ),
+        );
+        if (!stillAssigned && !updatedUnassigned.some((person) => person.id === removedPerson?.id)) {
+          updatedUnassigned = [
+            {
+              id: removedPerson.id,
+              externalId: removedPerson.externalId,
+              name: removedPerson.name,
+              role: removedPerson.role,
+              home: removedPerson.home ?? "Unknown",
+              primaryDepartmentId: removedPerson.primaryDepartmentId,
+              status: removedPerson.status,
+              employmentStatus: "unknown",
+              nextDue: removedPerson.nextDue,
+              lastTrainingAt: removedPerson.lastTrainingAt,
+            },
+            ...updatedUnassigned,
+          ];
+        }
+      }
+
+      queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
+        overview: updatedOverview,
+        unassigned: updatedUnassigned,
+      });
+
+      return { previous };
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(overviewKey, context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: overviewKey }),
   });
 
   const createSessionMutation = useMutation({
