@@ -259,9 +259,11 @@ function TrainingSessionBuilder() {
       }
 
       let removedPerson: UnassignedPerson | null = null;
+      let removedPersonId: string | null = null;
       const updatedOverview = previous.overview.map((session) => {
         const nextDay1 = session.day1Assignments.filter((assignment) => {
           if (assignment.id === assignmentId) {
+            removedPersonId = assignment.person.id;
             removedPerson = {
               id: assignment.person.id,
               externalId: assignment.person.externalId,
@@ -280,6 +282,7 @@ function TrainingSessionBuilder() {
         });
         const nextDay2 = session.day2Assignments.filter((assignment) => {
           if (assignment.id === assignmentId) {
+            removedPersonId = assignment.person.id;
             removedPerson = {
               id: assignment.person.id,
               externalId: assignment.person.externalId,
@@ -304,8 +307,7 @@ function TrainingSessionBuilder() {
       });
 
       let updatedUnassigned = previous.unassigned;
-      if (removedPerson) {
-        const removedPersonId = removedPerson.id;
+      if (removedPerson && removedPersonId) {
         const stillAssigned = updatedOverview.some((session) =>
           [...session.day1Assignments, ...session.day2Assignments].some(
             (assignment) => assignment.person.id === removedPersonId,
@@ -324,7 +326,6 @@ function TrainingSessionBuilder() {
         unassigned: updatedUnassigned,
       });
 
-      const removedPersonId = removedPerson?.id ?? null;
       if (removedPersonId) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
