@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { AppDataSource } from "../db/data-source";
 import { TrainingSession } from "../entities/TrainingSession";
+import { TrainingUnavailability } from "../entities/TrainingUnavailability";
 import { Person } from "../entities/Person";
 import { SessionAssignment } from "../entities/SessionAssignment";
 import { TrainingRequirement } from "../entities/TrainingRequirement";
@@ -210,18 +211,19 @@ function toIsoString(value?: Date | string | null) {
   return date.toISOString();
 }
 
-async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassigned: any[] }> {
+async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassigned: any[]; unavailable: any[] }> {
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
   const requirementGroupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
   const assignmentRepo = AppDataSource.getRepository(Assignment);
+  const unavailabilityRepo = AppDataSource.getRepository(TrainingUnavailability);
 
   const mandatoryRequirement = await requirementRepo.findOne({
     where: { name: "Mandatory Training" },
   });
   if (!mandatoryRequirement) {
-    return { overview: [], unassigned: [] };
+    return { overview: [], unassigned: [], unavailable: [] };
   }
 
   const sessions = await sessionRepo.find({
@@ -249,6 +251,20 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
       })
     : [];
   const filteredPersonList = personList.filter((person) => !isExcludedPerson(person));
+  const unavailabilityEntries = await unavailabilityRepo.find({
+    relations: {
+      person: {
+        role: true,
+        groups: true,
+      },
+    },
+  });
+  const unavailableIds = new Set(
+    unavailabilityEntries
+      .map((entry) => entry.person)
+      .filter((person) => person && !isExcludedPerson(person))
+      .map((person) => person.id),
+  );
   const personMap = new Map(filteredPersonList.map((person) => [person.id, person]));
   const assignmentMap = new Map(mandatoryAssignments.map((assignment) => [assignment.person.id, assignment]));
 
@@ -278,7 +294,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
       .filter((assignment) => assignment.day === 1)
       .map((assignment) => {
         const person = personMap.get(assignment.person.id) ?? assignment.person;
-        if (!person || isExcludedPerson(person)) {
+        if (!person || isExcludedPerson(person) || unavailableIds.has(person.id)) {
           return null;
         }
         const trainingDates = getTrainingDates(assignmentMap.get(person.id)?.evidence ?? []);
@@ -309,7 +325,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
       .filter((assignment) => assignment.day === 2)
       .map((assignment) => {
         const person = personMap.get(assignment.person.id) ?? assignment.person;
-        if (!person || isExcludedPerson(person)) {
+        if (!person || isExcludedPerson(person) || unavailableIds.has(person.id)) {
           return null;
         }
         const trainingDates = getTrainingDates(assignmentMap.get(person.id)?.evidence ?? []);
@@ -356,7 +372,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
   });
 
   const unassigned = filteredPersonList
-    .filter((person) => !assignedPersonIds.has(person.id))
+    .filter((person) => !assignedPersonIds.has(person.id) && !unavailableIds.has(person.id))
     .map((person) => {
       const compliance = summarizeCompliance(
         person,
@@ -394,7 +410,33 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
     lastTrainingAt: person.lastTrainingAt?.toISOString(),
   }));
 
-  return { overview, unassigned: normalizedUnassigned };
+  const unavailable = unavailabilityEntries
+    .map((entry) => entry.person)
+    .filter((person): person is Person => Boolean(person) && !isExcludedPerson(person))
+    .map((person) => {
+      const compliance = summarizeCompliance(
+        person,
+        mandatoryRequirement,
+        assignmentMap.get(person.id),
+        metaByRoleId,
+      );
+      const evidenceEntries = assignmentMap.get(person.id)?.evidence ?? [];
+      const trainingDates = getTrainingDates(evidenceEntries);
+      return {
+        id: person.id,
+        externalId: person.externalId,
+        name: person.fullName,
+        status: compliance.status,
+        home: person.homeLocation,
+        primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
+        role: person.role.name,
+        employmentStatus: person.employmentStatus,
+        nextDue: trainingDates.nextDue?.toISOString(),
+        lastTrainingAt: trainingDates.lastTrainingAt?.toISOString(),
+      };
+    });
+
+  return { overview, unassigned: normalizedUnassigned, unavailable };
 }
 
 router.get("/overview", async (_req, res) => {
@@ -437,6 +479,7 @@ router.post("/assign", async (req, res) => {
   const assignmentRepo = AppDataSource.getRepository(SessionAssignment);
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
+  const unavailabilityRepo = AppDataSource.getRepository(TrainingUnavailability);
 
   const session = await sessionRepo.findOneByOrFail({ id: sessionId });
   const person = await personRepo.findOneOrFail({
@@ -458,6 +501,8 @@ router.post("/assign", async (req, res) => {
   });
   const assignmentsByDay = new Map(existingAssignments.map((assignment) => [assignment.day, assignment]));
   const assignments: SessionAssignment[] = [];
+
+  await unavailabilityRepo.createQueryBuilder().delete().where("personId = :personId", { personId }).execute();
 
   for (const targetDay of [1, 2]) {
     const dayDropZoneId = `${dropZoneId}-day-${targetDay}`;
@@ -578,6 +623,50 @@ router.post("/assign/remove", async (req, res) => {
   const assignmentRepo = AppDataSource.getRepository(SessionAssignment);
   await assignmentRepo.delete({ id: assignmentId });
   res.status(204).send();
+});
+
+router.post("/unavailable", async (req, res) => {
+  const { personId, reason } = req.body;
+  if (!personId) {
+    return res.status(400).json({ message: "personId is required" });
+  }
+
+  const personRepo = AppDataSource.getRepository(Person);
+  const unavailabilityRepo = AppDataSource.getRepository(TrainingUnavailability);
+  const assignmentRepo = AppDataSource.getRepository(SessionAssignment);
+
+  const person = await personRepo.findOneByOrFail({ id: personId });
+  const existing = await unavailabilityRepo.findOne({
+    where: { person: { id: personId } },
+  });
+
+  if (existing) {
+    existing.reason = reason ?? existing.reason;
+    await unavailabilityRepo.save(existing);
+  } else {
+    await unavailabilityRepo.save(
+      unavailabilityRepo.create({
+        person,
+        reason,
+      }),
+    );
+  }
+
+  await assignmentRepo.createQueryBuilder().delete().where("personId = :personId", { personId }).execute();
+
+  res.json({ success: true });
+});
+
+router.post("/unavailable/remove", async (req, res) => {
+  const { personId } = req.body;
+  if (!personId) {
+    return res.status(400).json({ message: "personId is required" });
+  }
+
+  const unavailabilityRepo = AppDataSource.getRepository(TrainingUnavailability);
+  await unavailabilityRepo.createQueryBuilder().delete().where("personId = :personId", { personId }).execute();
+
+  res.json({ success: true });
 });
 
 router.delete("/sessions/:sessionId", async (req, res) => {

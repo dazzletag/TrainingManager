@@ -12,6 +12,7 @@ import { TrainingSession } from "../entities/TrainingSession";
 import { SessionAssignment } from "../entities/SessionAssignment";
 import { AppUser } from "../entities/AppUser";
 import { RecommendationSettings } from "../entities/RecommendationSettings";
+import { TrainingUnavailability } from "../entities/TrainingUnavailability";
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ export const AppDataSource = new DataSource({
     SessionAssignment,
     AppUser,
     RecommendationSettings,
+    TrainingUnavailability,
   ],
   migrations: [__dirname + "/migrations/*.{ts,js}"],
   options: {

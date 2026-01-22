@@ -166,6 +166,22 @@ export function removeSessionAssignment(assignmentId: string, role: string, emai
   );
 }
 
+export function markPersonUnavailable(body: { personId: string; reason?: string }, role: string, email: string) {
+  return apiClient.post("/scheduler/unavailable", body, {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function removePersonUnavailable(personId: string, role: string, email: string) {
+  return apiClient.post(
+    "/scheduler/unavailable/remove",
+    { personId },
+    {
+      headers: withHeaders(role, email),
+    },
+  );
+}
+
 export function publishTrainingSession(sessionId: string, role: string, email: string) {
   return apiClient.post(
     `/scheduler/sessions/${sessionId}/publish`,

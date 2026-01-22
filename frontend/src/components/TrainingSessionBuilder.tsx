@@ -21,13 +21,15 @@ import {
   deleteTrainingSession,
   removeSessionAssignment,
   recommendTrainingSession,
+  markPersonUnavailable,
+  removePersonUnavailable,
 } from "../services/api";
 
 type DragPayload = {
   personId: string;
   assignmentId?: string;
   day?: number;
-  source: "unassigned" | "day1" | "day2";
+  source: "unassigned" | "day1" | "day2" | "unavailable";
   sourceSessionId?: string;
 };
 
@@ -75,6 +77,10 @@ type UnassignedPerson = {
   lastTrainingAt?: string;
 };
 
+type UnavailablePerson = UnassignedPerson & {
+  reason?: string;
+};
+
 type PublishFeedback = {
   results: {
     personId: string;
@@ -100,6 +106,7 @@ type PublishFeedback = {
 type SchedulerOverviewData = {
   overview: SessionOverview[];
   unassigned: UnassignedPerson[];
+  unavailable: UnavailablePerson[];
 };
 
 const homePalette = ["#e3f2fd", "#f3e5f5", "#e8f5e9", "#fff3e0", "#fbe9e7"];
@@ -111,6 +118,18 @@ const homeColorOverrides: Record<string, string> = {
 };
 const getHomeKey = (person: { primaryDepartmentId?: string; home?: string }) =>
   person.primaryDepartmentId ?? person.home ?? "Unknown";
+const buildUnavailablePerson = (person: SessionAssignment["person"]): UnavailablePerson => ({
+  id: person.id,
+  externalId: person.externalId,
+  name: person.name,
+  role: person.role,
+  home: person.home ?? "Unknown",
+  primaryDepartmentId: person.primaryDepartmentId,
+  status: person.status,
+  employmentStatus: "unknown",
+  nextDue: person.nextDue,
+  lastTrainingAt: person.lastTrainingAt,
+});
 
 function TrainingSessionBuilder() {
   const { role, userEmail } = useUserContext();
@@ -140,6 +159,7 @@ function TrainingSessionBuilder() {
 
   const sessions: SessionOverview[] = overviewQuery.data?.overview ?? [];
   const unassigned: UnassignedPerson[] = overviewQuery.data?.unassigned ?? [];
+  const unavailable: UnavailablePerson[] = overviewQuery.data?.unavailable ?? [];
 
   const assignMutation = useMutation({
     mutationFn: (payload: { sessionId: string; personId: string; day: number; dropZoneId: string }) =>
@@ -157,6 +177,7 @@ function TrainingSessionBuilder() {
       }
 
       const personFromUnassigned = previous.unassigned.find((person) => person.id === payload.personId);
+      const personFromUnavailable = previous.unavailable.find((person) => person.id === payload.personId);
       let assignmentPerson: SessionAssignment["person"] | null = null;
 
       if (personFromUnassigned) {
@@ -171,6 +192,19 @@ function TrainingSessionBuilder() {
           status: personFromUnassigned.status,
           nextDue: personFromUnassigned.nextDue,
           lastTrainingAt: personFromUnassigned.lastTrainingAt,
+        };
+      } else if (personFromUnavailable) {
+        assignmentPerson = {
+          id: personFromUnavailable.id,
+          externalId: personFromUnavailable.externalId,
+          name: personFromUnavailable.name,
+          email: "",
+          role: personFromUnavailable.role,
+          home: personFromUnavailable.home,
+          primaryDepartmentId: personFromUnavailable.primaryDepartmentId,
+          status: personFromUnavailable.status,
+          nextDue: personFromUnavailable.nextDue,
+          lastTrainingAt: personFromUnavailable.lastTrainingAt,
         };
       } else {
         for (const session of previous.overview) {
@@ -224,10 +258,12 @@ function TrainingSessionBuilder() {
       });
 
       const updatedUnassigned = previous.unassigned.filter((person) => person.id !== payload.personId);
+      const updatedUnavailable = previous.unavailable.filter((person) => person.id !== payload.personId);
 
       queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
         overview: updatedOverview,
         unassigned: updatedUnassigned,
+        unavailable: updatedUnavailable,
       });
 
       return { previous, personId: payload.personId };
@@ -324,6 +360,7 @@ function TrainingSessionBuilder() {
       queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
         overview: updatedOverview,
         unassigned: updatedUnassigned,
+        unavailable: previous.unavailable,
       });
 
       if (removedPersonId !== null) {
@@ -347,6 +384,129 @@ function TrainingSessionBuilder() {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
           next.delete(pendingId);
+          return next;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+    },
+  });
+
+  const markUnavailableMutation = useMutation({
+    mutationFn: (payload: { personId: string; reason?: string }) =>
+      markPersonUnavailable(payload, role, userEmail),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: overviewKey });
+      setPendingPersonIds((prev) => {
+        const next = new Set(prev);
+        next.add(payload.personId);
+        return next;
+      });
+      const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
+      if (!previous) {
+        return { previous, personId: payload.personId };
+      }
+
+      const personFromUnavailable = previous.unavailable.find((person) => person.id === payload.personId);
+      const personFromUnassigned = previous.unassigned.find((person) => person.id === payload.personId);
+      let unavailablePerson: UnavailablePerson | null = personFromUnavailable ?? personFromUnassigned ?? null;
+
+      if (!unavailablePerson) {
+        for (const session of previous.overview) {
+          const assignment = [...session.day1Assignments, ...session.day2Assignments].find(
+            (entry) => entry.person.id === payload.personId,
+          );
+          if (assignment) {
+            unavailablePerson = buildUnavailablePerson(assignment.person);
+            break;
+          }
+        }
+      }
+
+      if (!unavailablePerson) {
+        return { previous, personId: payload.personId };
+      }
+
+      const updatedOverview = previous.overview.map((session) => ({
+        ...session,
+        day1Assignments: session.day1Assignments.filter(
+          (assignment) => assignment.person.id !== payload.personId,
+        ),
+        day2Assignments: session.day2Assignments.filter(
+          (assignment) => assignment.person.id !== payload.personId,
+        ),
+      }));
+
+      const updatedUnassigned = previous.unassigned.filter((person) => person.id !== payload.personId);
+      const updatedUnavailable = [
+        unavailablePerson,
+        ...previous.unavailable.filter((person) => person.id !== payload.personId),
+      ];
+
+      queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
+        overview: updatedOverview,
+        unassigned: updatedUnassigned,
+        unavailable: updatedUnavailable,
+      });
+
+      return { previous, personId: payload.personId };
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(overviewKey, context.previous);
+      }
+    },
+    onSettled: (_data, _error, _payload, context) => {
+      if (context?.personId) {
+        setPendingPersonIds((prev) => {
+          const next = new Set(prev);
+          next.delete(context.personId);
+          return next;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+    },
+  });
+
+  const removeUnavailableMutation = useMutation({
+    mutationFn: (payload: { personId: string; returnToUnassigned: boolean }) =>
+      removePersonUnavailable(payload.personId, role, userEmail),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: overviewKey });
+      setPendingPersonIds((prev) => {
+        const next = new Set(prev);
+        next.add(payload.personId);
+        return next;
+      });
+      const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
+      if (!previous) {
+        return { previous, personId: payload.personId };
+      }
+
+      const removedPerson = previous.unavailable.find((person) => person.id === payload.personId) ?? null;
+      const updatedUnavailable = previous.unavailable.filter((person) => person.id !== payload.personId);
+      const updatedUnassigned =
+        payload.returnToUnassigned && removedPerson && !previous.unassigned.some((person) => person.id === removedPerson.id)
+          ? [removedPerson, ...previous.unassigned]
+          : previous.unassigned;
+
+      queryClient.setQueryData<SchedulerOverviewData>(overviewKey, {
+        overview: previous.overview,
+        unassigned: updatedUnassigned,
+        unavailable: updatedUnavailable,
+      });
+
+      return { previous, personId: payload.personId };
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(overviewKey, context.previous);
+      }
+    },
+    onSettled: (_data, _error, _payload, context) => {
+      if (context?.personId) {
+        setPendingPersonIds((prev) => {
+          const next = new Set(prev);
+          next.delete(context.personId);
           return next;
         });
       }
@@ -422,6 +582,7 @@ function TrainingSessionBuilder() {
     const map = new Map<string, string>();
     const homes = new Set<string>();
     unassigned.forEach((person) => homes.add(getHomeKey(person)));
+    unavailable.forEach((person) => homes.add(getHomeKey(person)));
     sessions.forEach((session) => {
       session.day1Assignments.forEach((assignment) => homes.add(getHomeKey(assignment.person)));
       session.day2Assignments.forEach((assignment) => homes.add(getHomeKey(assignment.person)));
@@ -430,7 +591,7 @@ function TrainingSessionBuilder() {
       map.set(home, homeColorOverrides[home] ?? homePalette[index % homePalette.length]);
     });
     return map;
-  }, [unassigned, sessions]);
+  }, [unassigned, unavailable, sessions]);
 
   const handleDragStart = (event: DragEvent<HTMLDivElement>, payload: DragPayload) => {
     event.dataTransfer.setData("application/json", JSON.stringify(payload));
@@ -477,6 +638,11 @@ function TrainingSessionBuilder() {
     const payload = parseDragPayload(event);
     if (!payload) return;
 
+    if (payload.source === "unavailable") {
+      removeUnavailableMutation.mutate({ personId: payload.personId, returnToUnassigned: true });
+      return;
+    }
+
     if (payload.sourceSessionId) {
       await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId);
       return;
@@ -485,6 +651,15 @@ function TrainingSessionBuilder() {
     if (payload.assignmentId) {
       removeMutation.mutate(payload.assignmentId);
     }
+  };
+
+  const handleDropToUnavailable = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const payload = parseDragPayload(event);
+    if (!payload) return;
+    if (payload.source === "unavailable") return;
+
+    markUnavailableMutation.mutate({ personId: payload.personId });
   };
 
   const formatDate = (value?: string) =>
@@ -649,79 +824,154 @@ function TrainingSessionBuilder() {
             gridTemplateColumns: { xs: "1fr", lg: "320px 1fr" },
           }}
         >
-          <Paper
-            sx={{
-              p: 2,
-              backgroundColor: (theme) => theme.palette.background.default,
-              minHeight: 300,
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleDropToUnassigned}
-          >
-            <Typography variant="subtitle1" mb={1}>
-              Possible attendees
-            </Typography>
-            <Typography variant="subtitle2" color="text.secondary" mb={1}>
-              Drag an assignment card here to remove it, or drag staff into a session.
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Box
+          <Stack spacing={2}>
+            <Paper
               sx={{
-                display: "grid",
-                gap: 2,
-                gridTemplateColumns: "1fr",
-                maxHeight: { xs: 360, lg: 520 },
-                overflowY: "auto",
-                pr: 1,
+                p: 2,
+                backgroundColor: (theme) => theme.palette.background.default,
+                minHeight: 300,
               }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleDropToUnassigned}
             >
-              {mandatoryUnassigned.map((person) => (
-                <Paper
-                  key={person.id}
-                  draggable
-                  onDragStart={(event) =>
-                    handleDragStart(event, { personId: person.id, source: "unassigned" })
-                  }
-                  sx={{
-                    px: 2,
-                    py: isCollapsed ? 0.6 : 1,
-                    borderRight: "7px solid #0078D7",
-                    backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
-                    color: "common.black",
-                  }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Typography variant="body1" sx={{ color: "common.black" }}>
-                        {person.name}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
-                        {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        label={person.nextDue ? formatDate(person.nextDue) : "no date"}
-                        size="small"
-                        sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
-                      />
-                      {pendingPersonIds.has(person.id) && (
-                        <CircularProgress size={12} sx={{ color: "common.black" }} />
-                      )}
+              <Typography variant="subtitle1" mb={1}>
+                Possible attendees
+              </Typography>
+              <Typography variant="subtitle2" color="text.secondary" mb={1}>
+                Drag an assignment card here to remove it, or drag staff into a session.
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: "1fr",
+                  maxHeight: { xs: 360, lg: 520 },
+                  overflowY: "auto",
+                  pr: 1,
+                }}
+              >
+                {mandatoryUnassigned.map((person) => (
+                  <Paper
+                    key={person.id}
+                    draggable
+                    onDragStart={(event) =>
+                      handleDragStart(event, { personId: person.id, source: "unassigned" })
+                    }
+                    sx={{
+                      px: 2,
+                      py: isCollapsed ? 0.6 : 1,
+                      borderRight: "7px solid #0078D7",
+                      backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
+                      color: "common.black",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="body1" sx={{ color: "common.black" }}>
+                          {person.name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                          {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label={person.nextDue ? formatDate(person.nextDue) : "no date"}
+                          size="small"
+                          sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                        />
+                        {pendingPersonIds.has(person.id) && (
+                          <CircularProgress size={12} sx={{ color: "common.black" }} />
+                        )}
+                      </Stack>
                     </Stack>
-                  </Stack>
-                  {!isCollapsed && (
-                    <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
-                      Home: {person.home} - last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "-"}
-                    </Typography>
-                  )}
-                </Paper>
-              ))}
-              {!mandatoryUnassigned.length && (
-                <Typography color="text.secondary">Everyone has been allocated.</Typography>
-              )}
-            </Box>
-          </Paper>
+                    {!isCollapsed && (
+                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                        Home: {person.home} - last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "-"}
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+                {!mandatoryUnassigned.length && (
+                  <Typography color="text.secondary">Everyone has been allocated.</Typography>
+                )}
+              </Box>
+            </Paper>
+
+            <Paper
+              sx={{
+                p: 2,
+                backgroundColor: (theme) => theme.palette.background.default,
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleDropToUnavailable}
+            >
+              <Typography variant="subtitle1" mb={1}>
+                Unavailable staff
+              </Typography>
+              <Typography variant="subtitle2" color="text.secondary" mb={1}>
+                Drop staff here to exclude them from sessions (maternity leave, sickness).
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: "1fr",
+                  maxHeight: { xs: 240, lg: 320 },
+                  overflowY: "auto",
+                  pr: 1,
+                }}
+              >
+                {unavailable.map((person) => (
+                  <Paper
+                    key={person.id}
+                    draggable
+                    onDragStart={(event) =>
+                      handleDragStart(event, { personId: person.id, source: "unavailable" })
+                    }
+                    sx={{
+                      px: 2,
+                      py: isCollapsed ? 0.6 : 1,
+                      borderRight: "7px solid #8b0000",
+                      backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
+                      color: "common.black",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="body1" sx={{ color: "common.black" }}>
+                          {person.name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                          {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label={person.nextDue ? formatDate(person.nextDue) : "no date"}
+                          size="small"
+                          sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                        />
+                        {pendingPersonIds.has(person.id) && (
+                          <CircularProgress size={12} sx={{ color: "common.black" }} />
+                        )}
+                      </Stack>
+                    </Stack>
+                    {!isCollapsed && (
+                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                        Home: {person.home} - last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "-"}
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+                {!unavailable.length && (
+                  <Typography color="text.secondary">No unavailable staff saved.</Typography>
+                )}
+              </Box>
+            </Paper>
+          </Stack>
 
           <Box
             sx={{
