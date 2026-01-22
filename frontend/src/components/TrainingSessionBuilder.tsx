@@ -305,12 +305,13 @@ function TrainingSessionBuilder() {
 
       let updatedUnassigned = previous.unassigned;
       if (removedPerson) {
+        const removedPersonId = removedPerson.id;
         const stillAssigned = updatedOverview.some((session) =>
           [...session.day1Assignments, ...session.day2Assignments].some(
-            (assignment) => assignment.person.id === removedPerson?.id,
+            (assignment) => assignment.person.id === removedPersonId,
           ),
         );
-        if (!stillAssigned && !updatedUnassigned.some((person) => person.id === removedPerson?.id)) {
+        if (!stillAssigned && !updatedUnassigned.some((person) => person.id === removedPersonId)) {
           updatedUnassigned = [
             removedPerson,
             ...updatedUnassigned,
@@ -323,15 +324,16 @@ function TrainingSessionBuilder() {
         unassigned: updatedUnassigned,
       });
 
-      if (removedPerson) {
+      const removedPersonId = removedPerson?.id ?? null;
+      if (removedPersonId) {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
-          next.add(removedPerson.id);
+          next.add(removedPersonId);
           return next;
         });
       }
 
-      return { previous, personId: removedPerson?.id ?? null };
+      return { previous, personId: removedPersonId };
     },
     onError: (_error, _payload, context) => {
       if (context?.previous) {
