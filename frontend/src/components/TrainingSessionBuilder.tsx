@@ -242,18 +242,40 @@ function TrainingSessionBuilder() {
         return { previous };
       }
 
-      let removedPerson: SessionAssignment["person"] | null = null;
+      let removedPerson: UnassignedPerson | null = null;
       const updatedOverview = previous.overview.map((session) => {
         const nextDay1 = session.day1Assignments.filter((assignment) => {
           if (assignment.id === assignmentId) {
-            removedPerson = assignment.person;
+            removedPerson = {
+              id: assignment.person.id,
+              externalId: assignment.person.externalId,
+              name: assignment.person.name,
+              role: assignment.person.role,
+              home: assignment.person.home ?? "Unknown",
+              primaryDepartmentId: assignment.person.primaryDepartmentId,
+              status: assignment.person.status,
+              employmentStatus: "unknown",
+              nextDue: assignment.person.nextDue,
+              lastTrainingAt: assignment.person.lastTrainingAt,
+            };
             return false;
           }
           return true;
         });
         const nextDay2 = session.day2Assignments.filter((assignment) => {
           if (assignment.id === assignmentId) {
-            removedPerson = assignment.person;
+            removedPerson = {
+              id: assignment.person.id,
+              externalId: assignment.person.externalId,
+              name: assignment.person.name,
+              role: assignment.person.role,
+              home: assignment.person.home ?? "Unknown",
+              primaryDepartmentId: assignment.person.primaryDepartmentId,
+              status: assignment.person.status,
+              employmentStatus: "unknown",
+              nextDue: assignment.person.nextDue,
+              lastTrainingAt: assignment.person.lastTrainingAt,
+            };
             return false;
           }
           return true;
@@ -274,18 +296,7 @@ function TrainingSessionBuilder() {
         );
         if (!stillAssigned && !updatedUnassigned.some((person) => person.id === removedPerson?.id)) {
           updatedUnassigned = [
-            {
-              id: removedPerson.id,
-              externalId: removedPerson.externalId,
-              name: removedPerson.name,
-              role: removedPerson.role,
-              home: removedPerson.home ?? "Unknown",
-              primaryDepartmentId: removedPerson.primaryDepartmentId,
-              status: removedPerson.status,
-              employmentStatus: "unknown",
-              nextDue: removedPerson.nextDue,
-              lastTrainingAt: removedPerson.lastTrainingAt,
-            },
+            removedPerson,
             ...updatedUnassigned,
           ];
         }
