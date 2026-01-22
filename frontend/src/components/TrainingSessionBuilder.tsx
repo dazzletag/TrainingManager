@@ -9,6 +9,7 @@ import {
   TextField,
   Typography,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import { useMemo, useState, type DragEvent } from "react";
 import { useUserContext } from "../context/UserContext";
@@ -130,6 +131,7 @@ function TrainingSessionBuilder() {
   const [recommendFeedback, setRecommendFeedback] = useState<Record<string, { count: number; at: string }>>({});
   const [recommendErrors, setRecommendErrors] = useState<Record<string, boolean>>({});
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [pendingPersonIds, setPendingPersonIds] = useState<Set<string>>(new Set());
 
   const overviewQuery = useQuery({
     queryKey: overviewKey,
@@ -144,9 +146,14 @@ function TrainingSessionBuilder() {
       assignPersonToSession(payload, role, userEmail),
     onMutate: async (payload) => {
       await queryClient.cancelQueries({ queryKey: overviewKey });
+      setPendingPersonIds((prev) => {
+        const next = new Set(prev);
+        next.add(payload.personId);
+        return next;
+      });
       const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
       if (!previous) {
-        return { previous };
+        return { previous, personId: payload.personId };
       }
 
       const personFromUnassigned = previous.unassigned.find((person) => person.id === payload.personId);
@@ -223,14 +230,23 @@ function TrainingSessionBuilder() {
         unassigned: updatedUnassigned,
       });
 
-      return { previous };
+      return { previous, personId: payload.personId };
     },
     onError: (_error, _payload, context) => {
       if (context?.previous) {
         queryClient.setQueryData(overviewKey, context.previous);
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: overviewKey }),
+    onSettled: (_data, _error, _payload, context) => {
+      if (context?.personId) {
+        setPendingPersonIds((prev) => {
+          const next = new Set(prev);
+          next.delete(context.personId);
+          return next;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+    },
   });
 
   const removeMutation = useMutation({
@@ -239,7 +255,7 @@ function TrainingSessionBuilder() {
       await queryClient.cancelQueries({ queryKey: overviewKey });
       const previous = queryClient.getQueryData<SchedulerOverviewData>(overviewKey);
       if (!previous) {
-        return { previous };
+        return { previous, personId: null };
       }
 
       let removedPerson: UnassignedPerson | null = null;
@@ -307,14 +323,31 @@ function TrainingSessionBuilder() {
         unassigned: updatedUnassigned,
       });
 
-      return { previous };
+      if (removedPerson) {
+        setPendingPersonIds((prev) => {
+          const next = new Set(prev);
+          next.add(removedPerson.id);
+          return next;
+        });
+      }
+
+      return { previous, personId: removedPerson?.id ?? null };
     },
     onError: (_error, _payload, context) => {
       if (context?.previous) {
         queryClient.setQueryData(overviewKey, context.previous);
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: overviewKey }),
+    onSettled: (_data, _error, _payload, context) => {
+      if (context?.personId) {
+        setPendingPersonIds((prev) => {
+          const next = new Set(prev);
+          next.delete(context.personId);
+          return next;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+    },
   });
 
   const createSessionMutation = useMutation({
@@ -662,11 +695,16 @@ function TrainingSessionBuilder() {
                         {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
                       </Typography>
                     </Box>
-                    <Chip
-                      label={person.nextDue ? formatDate(person.nextDue) : "no date"}
-                      size="small"
-                      sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
-                    />
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip
+                        label={person.nextDue ? formatDate(person.nextDue) : "no date"}
+                        size="small"
+                        sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                      />
+                      {pendingPersonIds.has(person.id) && (
+                        <CircularProgress size={12} sx={{ color: "common.black" }} />
+                      )}
+                    </Stack>
                   </Stack>
                   {!isCollapsed && (
                     <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
@@ -852,13 +890,18 @@ function TrainingSessionBuilder() {
                                       </Typography>
                                     )}
                                   </Box>
-                                  {!isCollapsed && (
-                                    <Chip
-                                      label={assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
-                                      size="small"
-                                      sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
-                                    />
-                                  )}
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    {!isCollapsed && (
+                                      <Chip
+                                        label={assignment.person.nextDue ? formatDate(assignment.person.nextDue) : "no date"}
+                                        size="small"
+                                        sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                                      />
+                                    )}
+                                    {pendingPersonIds.has(assignment.person.id) && (
+                                      <CircularProgress size={12} sx={{ color: "common.black" }} />
+                                    )}
+                                  </Stack>
                                 </Paper>
                               ),
                             )}
