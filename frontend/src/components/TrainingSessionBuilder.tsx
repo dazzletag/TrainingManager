@@ -342,10 +342,11 @@ function TrainingSessionBuilder() {
       }
     },
     onSettled: (_data, _error, _payload, context) => {
-      if (context?.personId !== null && context?.personId !== undefined) {
+      const pendingId = context?.personId;
+      if (typeof pendingId === "string") {
         setPendingPersonIds((prev) => {
           const next = new Set(prev);
-          next.delete(context.personId as string);
+          next.delete(pendingId);
           return next;
         });
       }
