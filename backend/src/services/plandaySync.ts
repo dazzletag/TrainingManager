@@ -160,11 +160,11 @@ export async function syncPlandayData(): Promise<void> {
         continue;
       }
 
-      const existing = await employeeRepo.findOneBy({ externalId: employee.id });
+      const existing = await employeeRepo.findOneBy({ externalId: String(employee.id) });
       await employeeRepo.save(
         employeeRepo.create({
           id: existing?.id,
-          externalId: employee.id,
+          externalId: String(employee.id),
           fullName: employee.fullName,
           email: employee.email,
           employmentStatus: employee.employmentStatus,
