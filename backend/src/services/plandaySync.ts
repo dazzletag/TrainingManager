@@ -123,7 +123,7 @@ export async function syncPlandayData(): Promise<void> {
           id: existing?.id,
           externalId: roleExternalId,
           name: remoteRole.name,
-          category: remoteRole.category,
+          category: remoteRole.category ?? "Imported",
           description: remoteRole.description ?? "Imported from Planday",
         }),
       );
