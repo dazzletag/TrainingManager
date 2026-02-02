@@ -17,6 +17,7 @@ DEFAULT_PAGE_SIZE = 50
 DEFAULT_VALIDITY_MONTHS = int(os.getenv("PLANDAY_DEFAULT_VALIDITY_MONTHS", "12"))
 STATUS_FIELDS = {"Has Resigned", "On Parental Leave"}
 ONE_OFF_YEARS = {20, 50}
+NEXT_DUE_SUFFIX_PATTERN = re.compile(r"\bnext due\b.*$", re.IGNORECASE)
 
 
 def setup_logging() -> None:
@@ -34,6 +35,7 @@ def slugify(value: str) -> str:
 
 def normalize_course_name(raw: str) -> str:
     name = re.sub(r"\s+", " ", raw.strip())
+    name = NEXT_DUE_SUFFIX_PATTERN.sub("", name)
     name = re.sub(r"\s+completed$", "", name, flags=re.IGNORECASE)
     name = re.sub(r"\s+due$", "", name, flags=re.IGNORECASE)
     return name.strip()
@@ -78,7 +80,11 @@ def add_months(value: dt.datetime, months: int) -> dt.datetime:
     return value.replace(year=year, month=month, day=day)
 
 
-def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, str]]:
+def load_training_matrix() -> Tuple[
+    Dict[int, List[Dict[str, Any]]],
+    Dict[int, str],
+    Dict[int, Dict[str, Dict[str, Any]]],
+]:
     path = os.getenv(
         "PLANDAY_TRAINING_MATRIX_FILE",
         r"C:\Users\Darren\OneDrive - Bristol Care Homes\Desktop\trainingRqmt.xlsx",
@@ -108,6 +114,7 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
         group_names[group_id] = str(row.get("name"))
 
     required: Dict[int, List[Dict[str, Any]]] = {}
+    metadata_by_group: Dict[int, Dict[str, Dict[str, Any]]] = {}
     for _, row in sheet1.iterrows():
         group_id = row.get("EmployeeGroup")
         if pd.isna(group_id):
@@ -117,8 +124,8 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
         except (TypeError, ValueError):
             continue
 
-        course = str(row.get("Compliant Title") or row.get("Course") or "").strip()
-        if not course:
+        raw_course = str(row.get("Compliant Title") or row.get("Course") or "").strip()
+        if not raw_course:
             continue
         period_years = row.get("Period")
         try:
@@ -131,11 +138,25 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
         except (TypeError, ValueError):
             needed = 1
 
-        required.setdefault(group_id, []).append(
-            {
-                "course": course,
+        canonical_name = normalize_course_name(raw_course)
+        if not canonical_name:
+            continue
+        is_next_due = bool(NEXT_DUE_SUFFIX_PATTERN.search(raw_course))
+
+        group_meta = metadata_by_group.setdefault(group_id, {})
+        existing_meta = group_meta.get(canonical_name)
+        if not existing_meta or (existing_meta.get("is_next_due") and not is_next_due):
+            group_meta[canonical_name] = {
                 "needed": needed,
                 "period_years": period_years,
+                "is_next_due": is_next_due,
+            }
+
+        required.setdefault(group_id, []).append(
+            {
+                "course": raw_course,
+                "canonicalName": canonical_name,
+                "isNextDue": is_next_due,
             }
         )
 
@@ -145,7 +166,7 @@ def load_training_matrix() -> Tuple[Dict[int, List[Dict[str, Any]]], Dict[int, s
         except OSError:
             pass
 
-    return required, group_names
+    return required, group_names, metadata_by_group
 
 
 def load_validity_overrides() -> Dict[str, int]:
@@ -827,7 +848,7 @@ def log_audit(cursor: pyodbc.Cursor, what: str, why: str) -> None:
 def main() -> int:
     setup_logging()
     validity_overrides = load_validity_overrides()
-    training_matrix, group_names = load_training_matrix()
+    training_matrix, group_names, training_matrix_meta = load_training_matrix()
 
     token = get_access_token()
     session = build_session(token)
@@ -966,6 +987,7 @@ def main() -> int:
 
         for group_id in employee_groups:
             course_rows = training_matrix.get(group_id, [])
+            group_meta = training_matrix_meta.get(group_id, {})
             group_role_id = ensure_group_role(
                 cursor,
                 roles_by_external,
@@ -974,19 +996,27 @@ def main() -> int:
                 group_names.get(group_id),
             )
             for course in course_rows:
-                course_name = normalize_course_name(course["course"])
-                period_years = course.get("period_years", 0)
+                canonical_name = course.get("canonicalName")
+                if not canonical_name:
+                    continue
+                metadata = group_meta.get(canonical_name)
+                if not metadata:
+                    continue
+                period_years = metadata.get("period_years", 0)
                 is_one_off = period_years in ONE_OFF_YEARS
-                validity_months = validity_overrides.get(course_name, max(period_years * 12, DEFAULT_VALIDITY_MONTHS))
+                validity_months = validity_overrides.get(
+                    canonical_name,
+                    max(period_years * 12, DEFAULT_VALIDITY_MONTHS),
+                )
                 category = "one-off" if is_one_off else None
-                needed = course.get("needed", 1)
+                needed = metadata.get("needed", 1)
                 required_level = needed
                 mandatory = needed in (1, 3)
 
                 requirement_id = ensure_requirement(
                     cursor,
                     requirements_by_name,
-                    course_name,
+                    canonical_name,
                     validity_months,
                     mandatory,
                     category,
@@ -1017,7 +1047,7 @@ def main() -> int:
                 if is_one_off and valid_to < dt.datetime.now(dt.UTC):
                     valid_to = add_months(valid_from, 1200)
 
-                uploaded_file_key = f"planday:{slugify(course.get('course', 'training'))}"
+                uploaded_file_key = f"planday:{slugify(canonical_name)}"
                 upsert_evidence(
                     cursor,
                     evidence_by_key,
