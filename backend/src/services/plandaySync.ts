@@ -167,10 +167,10 @@ export async function syncPlandayData(): Promise<void> {
           externalId: String(employee.id),
           fullName: employee.fullName,
           email: employee.email,
-          employmentStatus: employee.employmentStatus,
+          employmentStatus: employee.employmentStatus ?? "Active",
           homeLocation: employee.homeLocation,
           role,
-          isActive: employee.employmentStatus.toLowerCase() === "active",
+          isActive: (employee.employmentStatus ?? "Active").toLowerCase() === "active",
         }),
       );
     }
