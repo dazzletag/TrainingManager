@@ -73,7 +73,7 @@ const schedulingClient = axios.create({
 
 export { hrClient as plandayHrClient, schedulingClient as plandaySchedulingClient };
 
-interface PlandayRole {
+interface PlandayEmployeeGroup {
   id: string;
   name: string;
   category: string;
@@ -105,14 +105,14 @@ export async function syncPlandayData(): Promise<void> {
       throw new Error("Planday access token unavailable");
     }
 
-    const [rolesResponse, employeesResponse] = await Promise.all([
-      hrClient.get<{ data: PlandayRole[] }>("/roles", { headers }),
+    const [groupsResponse, employeesResponse] = await Promise.all([
+      hrClient.get<{ data: PlandayEmployeeGroup[] }>("/employeegroups", { headers }),
       hrClient.get<{ data: PlandayEmployee[] }>("/employees", { headers }),
     ]);
 
     const roleRepo = AppDataSource.getRepository(Role);
 
-    const remoteRoles = rolesResponse.data.data;
+    const remoteRoles = groupsResponse.data.data;
     const mappedRoles = new Map<string, Role>();
 
     for (const remoteRole of remoteRoles) {
