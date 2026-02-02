@@ -86,7 +86,25 @@ interface PlandayEmployee {
   email: string;
   employmentStatus: string;
   homeLocation: string;
-  roleId: string;
+  roleId?: string;
+  employeeGroups?: Array<{ id?: number | string } | number | string>;
+  employeeGroupIds?: Array<number | string>;
+}
+
+function extractEmployeeGroupIds(employee: PlandayEmployee): string[] {
+  const ids: string[] = [];
+  const rawGroups = employee.employeeGroups ?? employee.employeeGroupIds ?? [];
+  for (const item of rawGroups) {
+    if (item === undefined || item === null) continue;
+    if (typeof item === "number" || typeof item === "string") {
+      ids.push(String(item));
+      continue;
+    }
+    if (typeof item === "object" && "id" in item && item.id !== undefined && item.id !== null) {
+      ids.push(String(item.id));
+    }
+  }
+  return ids;
 }
 
 export async function syncPlandayData(): Promise<void> {
@@ -132,7 +150,11 @@ export async function syncPlandayData(): Promise<void> {
 
     const employeeRepo = AppDataSource.getRepository(Person);
     for (const employee of employeesResponse.data.data) {
-      const role = mappedRoles.get(String(employee.roleId));
+      const candidateRoles = extractEmployeeGroupIds(employee)
+        .map((groupId) => mappedRoles.get(groupId))
+        .filter((entry): entry is Role => Boolean(entry));
+      const role =
+        candidateRoles[0] ?? (employee.roleId ? mappedRoles.get(String(employee.roleId)) : undefined);
       if (!role) {
         console.warn("Skipping employee with unknown role", employee.id);
         continue;
