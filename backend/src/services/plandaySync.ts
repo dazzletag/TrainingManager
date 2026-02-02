@@ -116,22 +116,23 @@ export async function syncPlandayData(): Promise<void> {
     const mappedRoles = new Map<string, Role>();
 
     for (const remoteRole of remoteRoles) {
-      const existing = await roleRepo.findOneBy({ externalId: remoteRole.id });
+      const roleExternalId = String(remoteRole.id);
+      const existing = await roleRepo.findOneBy({ externalId: roleExternalId });
       const role = await roleRepo.save(
         roleRepo.create({
           id: existing?.id,
-          externalId: remoteRole.id,
+          externalId: roleExternalId,
           name: remoteRole.name,
           category: remoteRole.category,
           description: remoteRole.description ?? "Imported from Planday",
         }),
       );
-      mappedRoles.set(remoteRole.id, role);
+      mappedRoles.set(roleExternalId, role);
     }
 
     const employeeRepo = AppDataSource.getRepository(Person);
     for (const employee of employeesResponse.data.data) {
-      const role = mappedRoles.get(employee.roleId);
+      const role = mappedRoles.get(String(employee.roleId));
       if (!role) {
         console.warn("Skipping employee with unknown role", employee.id);
         continue;
