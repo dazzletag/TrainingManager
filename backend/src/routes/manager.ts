@@ -5,6 +5,7 @@ import { TrainingRequirement } from "../entities/TrainingRequirement";
 import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { Assignment } from "../entities/Assignment";
 import { evaluateRequirement } from "../services/complianceService";
+import { dedupeRequirementCompliance } from "../services/requirementUtils";
 import { In } from "typeorm";
 
 const router = Router();
@@ -182,9 +183,7 @@ router.get("/compliance", async (req, res) => {
         assignmentMap.get(assignment.requirement.id),
       ),
     );
-    const requirementResultsFinal = Array.from(
-      new Map(requirementResults.map((item) => [item.requirement.id, item])).values(),
-    );
+    const requirementResultsFinal = dedupeRequirementCompliance(requirementResults);
 
     const compliantCount = requirementResultsFinal.filter((item) => item.status === "compliant").length;
     const atRiskCount = requirementResultsFinal.filter((item) => item.status === "at-risk").length;
@@ -328,9 +327,7 @@ router.get("/at-risk", async (req, res) => {
         assignmentMap.get(assignment.requirement.id),
       ),
     );
-    const requirementResultsFinal = Array.from(
-      new Map(requirementResults.map((item) => [item.requirement.id, item])).values(),
-    );
+    const requirementResultsFinal = dedupeRequirementCompliance(requirementResults);
 
     const needsAttention = requirementResultsFinal.some((result) => result.status !== "compliant");
 

@@ -18,6 +18,18 @@ DEFAULT_VALIDITY_MONTHS = int(os.getenv("PLANDAY_DEFAULT_VALIDITY_MONTHS", "12")
 STATUS_FIELDS = {"Has Resigned", "On Parental Leave"}
 ONE_OFF_YEARS = {20, 50}
 NEXT_DUE_SUFFIX_PATTERN = re.compile(r"\bnext due\b.*$", re.IGNORECASE)
+FIELD_NAME_COLUMNS = (
+    "Field Name",
+    "FieldName",
+    "Field_Name",
+    "Field",
+    "Custom Field",
+    "CustomField",
+    "Custom Field Name",
+    "CustomFieldName",
+    "Planday Field",
+    "Planday Field Name",
+)
 
 
 def setup_logging() -> None:
@@ -43,6 +55,17 @@ def normalize_course_name(raw: str) -> str:
 
 def is_due_field(raw: str) -> bool:
     return bool(re.search(r"\bdue\b", raw, flags=re.IGNORECASE))
+
+
+def determine_field_identifier(row: pd.Series) -> Optional[str]:
+    for column in FIELD_NAME_COLUMNS:
+        value = row.get(column)
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            continue
+        identifier = str(value).strip()
+        if identifier:
+            return identifier
+    return None
 
 
 def parse_date(value: Any) -> Optional[dt.datetime]:
@@ -142,14 +165,16 @@ def load_training_matrix() -> Tuple[
         if not canonical_name:
             continue
         is_next_due = bool(NEXT_DUE_SUFFIX_PATTERN.search(raw_course))
+        field_identifier = determine_field_identifier(row) or canonical_name
 
         group_meta = metadata_by_group.setdefault(group_id, {})
-        existing_meta = group_meta.get(canonical_name)
+        existing_meta = group_meta.get(field_identifier)
         if not existing_meta or (existing_meta.get("is_next_due") and not is_next_due):
-            group_meta[canonical_name] = {
+            group_meta[field_identifier] = {
                 "needed": needed,
                 "period_years": period_years,
                 "is_next_due": is_next_due,
+                "canonical_name": canonical_name,
             }
 
         required.setdefault(group_id, []).append(
@@ -157,6 +182,7 @@ def load_training_matrix() -> Tuple[
                 "course": raw_course,
                 "canonicalName": canonical_name,
                 "isNextDue": is_next_due,
+                "fieldIdentifier": field_identifier,
             }
         )
 
@@ -985,6 +1011,7 @@ def main() -> int:
 
         custom_field_values = build_custom_field_map(fields)
 
+        field_requirement_map: Dict[str, str] = {}
         for group_id in employee_groups:
             course_rows = training_matrix.get(group_id, [])
             group_meta = training_matrix_meta.get(group_id, {})
@@ -996,12 +1023,16 @@ def main() -> int:
                 group_names.get(group_id),
             )
             for course in course_rows:
+                field_identifier = course.get("fieldIdentifier") or course.get("canonicalName")
                 canonical_name = course.get("canonicalName")
                 if not canonical_name:
                     continue
-                metadata = group_meta.get(canonical_name)
+                metadata = group_meta.get(field_identifier)
+                if not metadata:
+                    metadata = group_meta.get(canonical_name)
                 if not metadata:
                     continue
+                canonical_name = metadata.get("canonical_name", canonical_name)
                 period_years = metadata.get("period_years", 0)
                 is_one_off = period_years in ONE_OFF_YEARS
                 validity_months = validity_overrides.get(
@@ -1013,15 +1044,18 @@ def main() -> int:
                 required_level = needed
                 mandatory = needed in (1, 3)
 
-                requirement_id = ensure_requirement(
-                    cursor,
-                    requirements_by_name,
-                    canonical_name,
-                    validity_months,
-                    mandatory,
-                    category,
-                    required_level,
-                )
+                requirement_id = field_requirement_map.get(field_identifier)
+                if not requirement_id:
+                    requirement_id = ensure_requirement(
+                        cursor,
+                        requirements_by_name,
+                        canonical_name,
+                        validity_months,
+                        mandatory,
+                        category,
+                        required_level,
+                    )
+                    field_requirement_map[field_identifier] = requirement_id
                 ensure_requirement_group_link(
                     cursor,
                     requirement_group_links,
@@ -1032,7 +1066,8 @@ def main() -> int:
                 )
                 assignment_id = ensure_assignment(cursor, assignments_by_key, person_id, requirement_id)
 
-                raw_value = lookup_custom_field(custom_field_values, course.get("course", ""))
+                lookup_key = field_identifier or course.get("course", "")
+                raw_value = lookup_custom_field(custom_field_values, lookup_key)
                 parsed_date = parse_date(raw_value)
                 if not parsed_date:
                     continue

@@ -8,6 +8,7 @@ import { Evidence } from "../entities/Evidence";
 import { evaluateRequirement } from "../services/complianceService";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
+import { dedupeRequirementCompliance } from "../services/requirementUtils";
 
 const router = Router();
 
@@ -138,6 +139,7 @@ router.get("/profile", async (req, res) => {
       assignmentMap.get(requirement.id),
     ),
   );
+  const dedupedRequirements = dedupeRequirementCompliance(requirements);
 
   res.json({
     person: {
@@ -147,7 +149,7 @@ router.get("/profile", async (req, res) => {
       role: person.role.name,
       homeLocation: person.homeLocation,
     },
-    requirements,
+    requirements: dedupedRequirements,
   });
 });
 
@@ -180,6 +182,7 @@ router.get("/:personId/requirements", async (req, res) => {
       assignmentMap.get(requirement.id),
     ),
   );
+  const dedupedRequirements = dedupeRequirementCompliance(requirements);
 
   res.json({
     person: {
@@ -189,7 +192,7 @@ router.get("/:personId/requirements", async (req, res) => {
       role: person.role.name,
       homeLocation: person.homeLocation,
     },
-    requirements,
+    requirements: dedupedRequirements,
   });
 });
 
