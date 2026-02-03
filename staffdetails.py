@@ -433,17 +433,6 @@ def fetch_lookup_maps(
         roles_by_external[row.externalId] = {"id": row.id, "name": row.name}
         roles_by_name[row.name] = {"id": row.id, "externalId": row.externalId}
 
-    requirements_by_name: Dict[str, Dict[str, Any]] = {}
-    cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
-    for row in cursor.fetchall():
-        requirements_by_name[row.name] = {
-            "id": row.id,
-            "validityPeriodMonths": row.validityPeriodMonths,
-            "mandatory": bool(row.mandatory),
-            "requiredLevel": row.requiredLevel,
-            "category": row.category,
-        }
-
     persons_by_external: Dict[str, Dict[str, Any]] = {}
     cursor.execute(
         "SELECT id, externalId, fullName, email, employmentStatus, homeLocation, isActive, roleId FROM person"
@@ -562,13 +551,15 @@ def ensure_group_role(
 def ensure_requirement(
     cursor: pyodbc.Cursor,
     requirements_by_name: Dict[str, Dict[str, Any]],
+    requirements_by_field_identifier: Dict[str, Dict[str, Any]],
     name: str,
     validity_months: int,
     mandatory: bool,
     category: Optional[str],
     required_level: int,
+    field_identifier: str,
 ) -> str:
-    existing = requirements_by_name.get(name)
+    existing = requirements_by_field_identifier.get(field_identifier) or requirements_by_name.get(name)
     if existing:
         updates = []
         params: List[Any] = []
@@ -584,6 +575,9 @@ def ensure_requirement(
         if existing.get("category") != category:
             updates.append("category = ?")
             params.append(category)
+        if existing.get("fieldIdentifier") != field_identifier:
+            updates.append("fieldIdentifier = ?")
+            params.append(field_identifier)
         if updates:
             params.append(existing["id"])
             cursor.execute(
@@ -596,8 +590,11 @@ def ensure_requirement(
                     "mandatory": mandatory,
                     "requiredLevel": required_level,
                     "category": category,
+                    "fieldIdentifier": field_identifier,
                 }
             )
+        requirements_by_field_identifier[field_identifier] = existing
+        requirements_by_name[name] = existing
         return str(existing["id"])
 
     description = f"Imported from Planday training matrix ({name})"
@@ -605,24 +602,28 @@ def ensure_requirement(
         description = f"{description}. Category: {category}"
 
     cursor.execute(
-        "INSERT INTO training_requirement (id, name, description, validityPeriodMonths, mandatory, requiredLevel, category, createdAt, updatedAt) "
-        "VALUES (NEWID(), ?, ?, ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
+        "INSERT INTO training_requirement (id, name, description, validityPeriodMonths, mandatory, requiredLevel, category, fieldIdentifier, createdAt, updatedAt) "
+        "VALUES (NEWID(), ?, ?, ?, ?, ?, ?, ?, GETUTCDATE(), GETUTCDATE())",
         name,
         description,
         validity_months,
         1 if mandatory else 0,
         required_level,
         category,
+        field_identifier,
     )
     cursor.execute("SELECT id FROM training_requirement WHERE name = ?", name)
     requirement_id = str(cursor.fetchone().id)
-    requirements_by_name[name] = {
+    entry = {
         "id": requirement_id,
         "validityPeriodMonths": validity_months,
         "mandatory": mandatory,
         "requiredLevel": required_level,
         "category": category,
+        "fieldIdentifier": field_identifier,
     }
+    requirements_by_name[name] = entry
+    requirements_by_field_identifier[field_identifier] = entry
 
     return requirement_id
 
@@ -896,15 +897,23 @@ def main() -> int:
     ) = fetch_lookup_maps(cursor)
     remove_job_title_links(cursor, requirement_group_links)
     requirements_by_name: Dict[str, Dict[str, Any]] = {}
-    cursor.execute("SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category FROM training_requirement")
+    requirements_by_field_identifier: Dict[str, Dict[str, Any]] = {}
+    cursor.execute(
+        "SELECT id, name, validityPeriodMonths, mandatory, requiredLevel, category, fieldIdentifier FROM training_requirement"
+    )
     for row in cursor.fetchall():
-        requirements_by_name[row.name] = {
+        entry = {
             "id": row.id,
             "validityPeriodMonths": row.validityPeriodMonths,
             "mandatory": bool(row.mandatory),
             "requiredLevel": row.requiredLevel,
             "category": row.category,
+            "fieldIdentifier": row.fieldIdentifier,
         }
+        requirements_by_name[row.name] = entry
+        field_id = row.fieldIdentifier or row.name
+        if field_id:
+            requirements_by_field_identifier[field_id] = entry
 
     evidence_by_key: Dict[Tuple[str, str], str] = {}
     cursor.execute(
@@ -1023,10 +1032,10 @@ def main() -> int:
                 group_names.get(group_id),
             )
             for course in course_rows:
-                field_identifier = course.get("fieldIdentifier") or course.get("canonicalName")
                 canonical_name = course.get("canonicalName")
                 if not canonical_name:
                     continue
+                field_identifier = course.get("fieldIdentifier") or canonical_name
                 metadata = group_meta.get(field_identifier)
                 if not metadata:
                     metadata = group_meta.get(canonical_name)
@@ -1049,11 +1058,13 @@ def main() -> int:
                     requirement_id = ensure_requirement(
                         cursor,
                         requirements_by_name,
+                        requirements_by_field_identifier,
                         canonical_name,
                         validity_months,
                         mandatory,
                         category,
                         required_level,
+                        field_identifier,
                     )
                     field_requirement_map[field_identifier] = requirement_id
                 ensure_requirement_group_link(

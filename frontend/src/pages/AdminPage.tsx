@@ -101,6 +101,7 @@ function AdminPage() {
     });
   };
   const [sectionInput, setSectionInput] = useState("");
+  const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
   const sectionsQuery = useQuery({
     queryKey: ["adminRequirementSections", role],
@@ -258,6 +259,35 @@ function AdminPage() {
     items: sortedRequirements.filter((requirement: any) => getSectionLabel(requirement) === label),
   }));
 
+  useEffect(() => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      availableSections.forEach((label) => {
+        if (!next.has(label)) {
+          next.add(label);
+          changed = true;
+        }
+      });
+      if (!changed) {
+        return prev;
+      }
+      return Array.from(next);
+    });
+  }, [availableSections]);
+
+  const handleAccordionToggle = (label: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return Array.from(next);
+    });
+  };
+
   const handleSortChange = (key: string) => {
     setSortState((prev) => {
       if (prev.key === key) {
@@ -295,7 +325,12 @@ function AdminPage() {
           </Typography>
           {trainingRequirementsQuery.isLoading && <CircularProgress size={24} />}
           {sectionGroups.map((group) => (
-            <Accordion key={group.label} defaultExpanded disableGutters>
+            <Accordion
+              key={group.label}
+              expanded={expandedSections.includes(group.label)}
+              onChange={() => handleAccordionToggle(group.label)}
+              disableGutters
+            >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                   {group.label}
@@ -552,6 +587,7 @@ function AdminPage() {
                       minimumAttendees: formValues.minimumAttendees,
                       enabled: formValues.enabled,
                       roleExternalIds: formValues.roleExternalIds,
+                      section: formValues.section,
                     };
                     if (editingId) {
                       updateMutation.mutate({ id: editingId, body: payload });

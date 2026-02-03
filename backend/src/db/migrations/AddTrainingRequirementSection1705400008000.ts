@@ -7,8 +7,8 @@ export class AddTrainingRequirementSection1705400008000 implements MigrationInte
         name: "training_requirement_section",
         columns: [
           {
-            name: "id",
-            type: "uuid",
+        name: "id",
+        type: "uniqueidentifier",
             isPrimary: true,
             isGenerated: true,
             generationStrategy: "uuid",
