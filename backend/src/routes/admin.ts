@@ -9,6 +9,7 @@ import { RecommendationSettings } from "../entities/RecommendationSettings";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 import { coerceRecommendationSettings, getRecommendationSettings } from "../services/recommendationSettings";
+import { Assignment } from "../entities/Assignment";
 
 const router = Router();
 
@@ -181,6 +182,48 @@ router.put("/training-requirements/:id", async (req, res) => {
   });
 
   res.json({ requirement });
+});
+
+router.delete("/training-requirements/:id", async (req, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const { id } = req.params;
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const assignmentRepo = AppDataSource.getRepository(Assignment);
+  const evidenceRepo = AppDataSource.getRepository(Evidence);
+
+  const requirement = await requirementRepo.findOne({ where: { id } });
+  if (!requirement) {
+    return res.status(404).json({ message: "Requirement not found" });
+  }
+
+  const assignments = await assignmentRepo.find({
+    where: { requirement: { id } },
+  });
+  const assignmentIds = assignments.map((assignment) => assignment.id);
+  if (assignmentIds.length) {
+    await evidenceRepo
+      .createQueryBuilder()
+      .delete()
+      .where("assignmentId IN (:...ids)", { ids: assignmentIds })
+      .execute();
+    await assignmentRepo
+      .createQueryBuilder()
+      .delete()
+      .where("requirementId = :id", { id })
+      .execute();
+  }
+
+  await requirementRepo.delete({ id });
+
+  await logAudit({
+    who: req.user?.email ?? "system",
+    what: "training-requirement-deleted",
+    why: `Deleted ${requirement.name}`,
+  });
+
+  res.json({ ok: true });
 });
 
 router.get("/audit", async (req, res) => {

@@ -84,6 +84,12 @@ export function updateTrainingRequirement(id: string, body: any, role: string, e
   });
 }
 
+export function deleteTrainingRequirement(id: string, role: string, email: string) {
+  return apiClient.delete(`/admin/training-requirements/${id}`, {
+    headers: withHeaders(role, email),
+  });
+}
+
 export function fetchAuditTrail(role: string, email: string) {
   return apiClient.get("/admin/audit", {
     headers: withHeaders(role, email),

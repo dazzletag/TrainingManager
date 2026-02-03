@@ -25,7 +25,21 @@ import {
   CircularProgress,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
-import { fetchTrainingRequirements, createTrainingRequirement, updateTrainingRequirement, fetchRoles, fetchAuditTrail, fetchManagerAtRisk, approveEvidence, fetchAdminUsers, upsertAdminUser, deleteAdminUser, fetchRecommendationSettings, updateRecommendationSettings } from "../services/api";
+import {
+  fetchTrainingRequirements,
+  createTrainingRequirement,
+  updateTrainingRequirement,
+  deleteTrainingRequirement,
+  fetchRoles,
+  fetchAuditTrail,
+  fetchManagerAtRisk,
+  approveEvidence,
+  fetchAdminUsers,
+  upsertAdminUser,
+  deleteAdminUser,
+  fetchRecommendationSettings,
+  updateRecommendationSettings,
+} from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import { Fragment, useEffect, useState } from "react";
 
@@ -35,22 +49,25 @@ const requiredLevelLabels: Record<number, string> = {
   3: "Home compliance",
 };
 
+const getDefaultFormValues = () => ({
+  name: "",
+  description: "",
+  validityPeriodMonths: 12,
+  requiredLevel: 1,
+  category: "",
+  importanceLevel: 3,
+  minimumAttendees: 8,
+  enabled: true,
+  roleExternalIds: [] as string[],
+});
+type FormValues = ReturnType<typeof getDefaultFormValues>;
+
 function AdminPage() {
   const { role, userEmail } = useUserContext();
   const [tabIndex, setTabIndex] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [accessForm, setAccessForm] = useState({ email: "", role: "manager" });
-  const [formValues, setFormValues] = useState({
-    name: "",
-    description: "",
-    validityPeriodMonths: 12,
-    requiredLevel: 1,
-    category: "",
-    importanceLevel: 3,
-    minimumAttendees: 8,
-    enabled: true,
-    roleExternalIds: [] as string[],
-  });
+  const [formValues, setFormValues] = useState<FormValues>(getDefaultFormValues);
   const [sortState, setSortState] = useState<{ key: string; direction: "asc" | "desc" }>({
     key: "name",
     direction: "asc",
@@ -60,6 +77,19 @@ function AdminPage() {
     minimumAttendeesDefault: 8,
     importanceWeightMultiplier: 2,
   });
+  const clearForm = () => {
+    setFormValues(getDefaultFormValues());
+    setEditingId(null);
+  };
+  const clearFormIfEditing = (targetId: string) => {
+    setEditingId((current) => {
+      if (current === targetId) {
+        setFormValues(getDefaultFormValues());
+        return null;
+      }
+      return current;
+    });
+  };
 
   const trainingRequirementsQuery = useQuery({
     queryKey: ["adminTrainingRequirements", role],
@@ -100,6 +130,14 @@ function AdminPage() {
   const updateMutation = useMutation({
     mutationFn: (payload: { id: string; body: any }) => updateTrainingRequirement(payload.id, payload.body, role, userEmail),
     onSuccess: () => trainingRequirementsQuery.refetch(),
+  });
+
+  const deleteRequirementMutation = useMutation({
+    mutationFn: (id: string) => deleteTrainingRequirement(id, role, userEmail),
+    onSuccess: (_, deletedId) => {
+      clearFormIfEditing(deletedId);
+      trainingRequirementsQuery.refetch();
+    },
   });
 
   const approveMutation = useMutation({
@@ -264,25 +302,44 @@ function AdminPage() {
                         <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
                         <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
                         <TableCell>
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setEditingId(requirement.id);
-                              setFormValues({
-                                name: requirement.name ?? "",
-                                description: requirement.description ?? "",
-                                validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
-                                requiredLevel: requirement.requiredLevel ?? 1,
-                                category: requirement.category ?? "",
-                                importanceLevel: requirement.importanceLevel ?? 3,
-                                minimumAttendees: requirement.minimumAttendees ?? 8,
-                                enabled: requirement.enabled ?? true,
-                                roleExternalIds: requirement.roles.map((role: any) => role.externalId),
-                              });
-                            }}
-                          >
-                            Edit
-                          </Button>
+                          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                setEditingId(requirement.id);
+                                setFormValues({
+                                  name: requirement.name ?? "",
+                                  description: requirement.description ?? "",
+                                  validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
+                                  requiredLevel: requirement.requiredLevel ?? 1,
+                                  category: requirement.category ?? "",
+                                  importanceLevel: requirement.importanceLevel ?? 3,
+                                  minimumAttendees: requirement.minimumAttendees ?? 8,
+                                  enabled: requirement.enabled ?? true,
+                                  roleExternalIds: requirement.roles.map((role: any) => role.externalId),
+                                });
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              disabled={deleteRequirementMutation.status === "pending"}
+                              onClick={() => {
+                                const confirmed = window.confirm(
+                                  `Delete “${requirement.name ?? "this requirement"}”? This will remove any evidence tied to it.`,
+                                );
+                                if (!confirmed) {
+                                  return;
+                                }
+                                deleteRequirementMutation.mutate(requirement.id);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -297,6 +354,17 @@ function AdminPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {deleteRequirementMutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              Unable to delete requirement
+            </Alert>
+          )}
+          {deleteRequirementMutation.isSuccess && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Requirement deleted
+            </Alert>
           )}
 
           <Box mt={3} component="form" autoComplete="off">
@@ -431,20 +499,7 @@ function AdminPage() {
                 {editingId && (
                   <Button
                     variant="text"
-                    onClick={() => {
-                      setEditingId(null);
-                      setFormValues({
-                        name: "",
-                        description: "",
-                        validityPeriodMonths: 12,
-                        requiredLevel: 1,
-                        category: "",
-                        importanceLevel: 3,
-                        minimumAttendees: 8,
-                        enabled: true,
-                        roleExternalIds: [],
-                      });
-                    }}
+                    onClick={clearForm}
                   >
                     Cancel
                   </Button>
