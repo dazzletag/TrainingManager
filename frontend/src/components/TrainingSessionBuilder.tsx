@@ -679,7 +679,7 @@ function TrainingSessionBuilder() {
       ["compliant", 2],
     ]);
     return unassigned
-      .filter((person) => person.status !== "compliant")
+      .filter((person) => showAllMandatory || person.status !== "compliant")
       .slice()
       .sort((a, b) => {
         const statusDelta = (statusOrder.get(a.status) ?? 99) - (statusOrder.get(b.status) ?? 99);
@@ -689,7 +689,7 @@ function TrainingSessionBuilder() {
         if (!b.nextDue) return -1;
         return new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime();
       });
-  }, [unassigned]);
+  }, [unassigned, showAllMandatory]);
 
   const mandatoryDisplayList = useMemo(() => {
     const normalizedSearch = mandatorySearch.trim().toLowerCase();
