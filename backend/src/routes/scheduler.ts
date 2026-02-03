@@ -17,15 +17,16 @@ import { In } from "typeorm";
 
 const router = Router();
 
-const excludedNames = new Set(["rich crocker", "linda warren"]);
+const excludedRoleNames = new Set(["ceo", "finance director"]);
 
 function isExcludedPerson(person: Person) {
   const name = person.fullName?.toLowerCase() ?? "";
   const status = person.employmentStatus?.toLowerCase() ?? "";
+  const roleName = person.role?.name?.toLowerCase() ?? "";
   const flagged = person as Person & { hasResigned?: boolean; parentalLeave?: boolean };
   return (
     name.includes("agency") ||
-    excludedNames.has(name) ||
+    excludedRoleNames.has(roleName) ||
     flagged.hasResigned === true ||
     flagged.parentalLeave === true ||
     status.includes("resign") ||
