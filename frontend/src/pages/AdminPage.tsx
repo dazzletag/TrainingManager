@@ -14,6 +14,7 @@ import {
   FormControlLabel,
   InputAdornment,
   InputLabel,
+  IconButton,
   List,
   ListItem,
   ListItemText,
@@ -55,6 +56,7 @@ import { useUserContext } from "../context/UserContext";
 import { useEffect, useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
@@ -182,6 +184,14 @@ function AdminPage() {
     mutationFn: (payload: { id: string; body: any }) => updateTrainingRequirement(payload.id, payload.body, role, userEmail),
     onSuccess: () => trainingRequirementsQuery.refetch(),
   });
+
+  useEffect(() => {
+    if (formDialogOpen && (createMutation.isSuccess || updateMutation.isSuccess)) {
+      handleCloseFormDialog();
+      createMutation.reset();
+      updateMutation.reset();
+    }
+  }, [formDialogOpen, createMutation.isSuccess, updateMutation.isSuccess]);
 
   const deleteRequirementMutation = useMutation({
     mutationFn: (id: string) => deleteTrainingRequirement(id, role, userEmail),
@@ -513,7 +523,14 @@ function AdminPage() {
         </Box>
       )}
       <Dialog open={formDialogOpen} onClose={handleCloseFormDialog} fullWidth maxWidth="md">
-        <DialogTitle>{editingId ? "Edit requirement" : "Define new requirement"}</DialogTitle>
+        <DialogTitle
+          sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
+        >
+          {editingId ? "Edit requirement" : "Define new requirement"}
+          <IconButton size="small" onClick={handleCloseFormDialog}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
         <DialogContent dividers>
           <Box
             sx={{
