@@ -72,6 +72,18 @@ export function fetchTrainingRequirements(role: string, email: string) {
   });
 }
 
+export function fetchRequirementSections(role: string, email: string) {
+  return apiClient.get("/admin/training-requirement-sections", {
+    headers: withHeaders(role, email),
+  });
+}
+
+export function createRequirementSection(body: { name: string }, role: string, email: string) {
+  return apiClient.post("/admin/training-requirement-sections", body, {
+    headers: withHeaders(role, email),
+  });
+}
+
 export function createTrainingRequirement(body: any, role: string, email: string) {
   return apiClient.post("/admin/training-requirements", body, {
     headers: withHeaders(role, email),

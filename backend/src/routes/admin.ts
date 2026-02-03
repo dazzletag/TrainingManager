@@ -10,6 +10,7 @@ import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 import { coerceRecommendationSettings, getRecommendationSettings } from "../services/recommendationSettings";
 import { Assignment } from "../entities/Assignment";
+import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
 
 const router = Router();
 
@@ -86,6 +87,30 @@ router.get("/training-requirements", async (req, res) => {
   const repo = AppDataSource.getRepository(TrainingRequirement);
   const requirements = await repo.find({ relations: ["roles"] });
   res.json({ requirements });
+});
+
+router.get("/training-requirement-sections", async (_req, res) => {
+  const repo = AppDataSource.getRepository(TrainingRequirementSection);
+  const sections = await repo.find({ order: { name: "ASC" } });
+  res.json({ sections });
+});
+
+router.post("/training-requirement-sections", async (req, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  const name = String(req.body?.name ?? "").trim();
+  if (!name) {
+    return res.status(400).json({ message: "Section name is required" });
+  }
+  const repo = AppDataSource.getRepository(TrainingRequirementSection);
+  const existing = await repo.findOne({ where: { name } });
+  if (existing) {
+    return res.status(409).json({ section: existing });
+  }
+  const section = repo.create({ name });
+  const saved = await repo.save(section);
+  res.status(201).json({ section: saved });
 });
 
 router.post("/training-requirements", async (req, res) => {

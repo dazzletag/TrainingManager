@@ -34,6 +34,8 @@ import {
   createTrainingRequirement,
   updateTrainingRequirement,
   deleteTrainingRequirement,
+  fetchRequirementSections,
+  createRequirementSection,
   fetchRoles,
   fetchAuditTrail,
   fetchManagerAtRisk,
@@ -98,20 +100,27 @@ function AdminPage() {
       return current;
     });
   };
-  const [sections, setSections] = useState<string[]>(defaultSections);
   const [sectionInput, setSectionInput] = useState("");
+
+  const sectionsQuery = useQuery({
+    queryKey: ["adminRequirementSections", role],
+    queryFn: () => fetchRequirementSections(role, userEmail).then((response) => response.data.sections),
+  });
+
+  const createSectionMutation = useMutation({
+    mutationFn: (name: string) => createRequirementSection({ name }, role, userEmail),
+    onSuccess: () => {
+      sectionsQuery.refetch();
+      setSectionInput("");
+    },
+  });
+
   const handleAddSection = () => {
     const trimmed = sectionInput.trim();
     if (!trimmed) {
       return;
     }
-    setSections((prev) => {
-      if (prev.includes(trimmed)) {
-        return prev;
-      }
-      return [...prev, trimmed];
-    });
-    setSectionInput("");
+    createSectionMutation.mutate(trimmed);
   };
 
   const trainingRequirementsQuery = useQuery({
@@ -235,13 +244,15 @@ function AdminPage() {
     const raw = (requirement.section ?? defaultSections[2]).trim();
     return raw || defaultSections[2];
   };
-  const sectionsFromRequirements = Array.from(
-    new Set(requirements.map(getSectionLabel)),
-  ) as string[];
-  const availableSections: string[] = [
-    ...sections,
-    ...sectionsFromRequirements.filter((label) => !sections.includes(label)),
-  ];
+  const sectionsFromRequirements = Array.from(new Set(requirements.map(getSectionLabel))) as string[];
+  const persistedSections = sectionsQuery.data ?? [];
+  const availableSections: string[] = Array.from(
+    new Set([
+      ...defaultSections,
+      ...(persistedSections.map((section: any) => section.name ?? "").filter(Boolean)),
+      ...sectionsFromRequirements,
+    ]),
+  );
   const sectionGroups = availableSections.map((label) => ({
     label,
     items: sortedRequirements.filter((requirement: any) => getSectionLabel(requirement) === label),
