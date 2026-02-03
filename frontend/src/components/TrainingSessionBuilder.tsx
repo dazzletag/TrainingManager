@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Divider,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
@@ -24,6 +25,7 @@ import {
   markPersonUnavailable,
   removePersonUnavailable,
 } from "../services/api";
+import SearchIcon from "@mui/icons-material/Search";
 
 type DragPayload = {
   personId: string;
@@ -130,6 +132,9 @@ const buildUnavailablePerson = (person: SessionAssignment["person"]): Unavailabl
   nextDue: person.nextDue,
   lastTrainingAt: person.lastTrainingAt,
 });
+const MS_IN_DAY = 1000 * 60 * 60 * 24;
+const DUE_WINDOW_DAYS = 90;
+const DUE_WINDOW_MS = DUE_WINDOW_DAYS * MS_IN_DAY;
 
 function TrainingSessionBuilder() {
   const { role, userEmail } = useUserContext();
@@ -151,6 +156,8 @@ function TrainingSessionBuilder() {
   const [recommendErrors, setRecommendErrors] = useState<Record<string, boolean>>({});
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [pendingPersonIds, setPendingPersonIds] = useState<Set<string>>(new Set());
+  const [mandatorySearch, setMandatorySearch] = useState("");
+  const [showAllMandatory, setShowAllMandatory] = useState(false);
 
   const overviewQuery = useQuery({
     queryKey: overviewKey,
@@ -684,6 +691,24 @@ function TrainingSessionBuilder() {
       });
   }, [unassigned]);
 
+  const mandatoryDisplayList = useMemo(() => {
+    const normalizedSearch = mandatorySearch.trim().toLowerCase();
+    const now = new Date().getTime();
+    return mandatoryUnassigned.filter((person) => {
+      if (!showAllMandatory && person.nextDue) {
+        const dueTime = new Date(person.nextDue).getTime();
+        if (!Number.isNaN(dueTime) && dueTime - now > DUE_WINDOW_MS) {
+          return false;
+        }
+      }
+      if (!normalizedSearch) {
+        return true;
+      }
+      const haystack = `${person.name} ${person.role} ${person.home}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [mandatoryUnassigned, mandatorySearch, showAllMandatory]);
+
   const findPersonName = (session: SessionOverview, personId: string) => {
     const assignments = [...session.day1Assignments, ...session.day2Assignments];
     return assignments.find((assignment) => assignment.person.id === personId)?.person.name ?? personId;
@@ -825,79 +850,116 @@ function TrainingSessionBuilder() {
           }}
         >
           <Stack spacing={2}>
-            <Paper
+          <Paper
+            sx={{
+              p: 2,
+              backgroundColor: (theme) => theme.palette.background.default,
+              minHeight: 300,
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDropToUnassigned}
+          >
+            <Typography variant="subtitle1" mb={1}>
+              Possible attendees
+            </Typography>
+            <Typography variant="subtitle2" color="text.secondary" mb={1}>
+              Drag an assignment card here to remove it, or drag staff into a session.
+            </Typography>
+            <Box
               sx={{
-                p: 2,
-                backgroundColor: (theme) => theme.palette.background.default,
-                minHeight: 300,
+                display: "flex",
+                gap: 1,
+                alignItems: "flex-end",
+                flexWrap: "wrap",
+                mb: 1,
               }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={handleDropToUnassigned}
             >
-              <Typography variant="subtitle1" mb={1}>
-                Possible attendees
-              </Typography>
-              <Typography variant="subtitle2" color="text.secondary" mb={1}>
-                Drag an assignment card here to remove it, or drag staff into a session.
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              <Box
-                sx={{
-                  display: "grid",
-                  gap: 2,
-                  gridTemplateColumns: "1fr",
-                  maxHeight: { xs: 360, lg: 520 },
-                  overflowY: "auto",
-                  pr: 1,
+              <TextField
+                label="Search staff"
+                size="small"
+                value={mandatorySearch}
+                onChange={(event) => setMandatorySearch(event.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
                 }}
-              >
-                {mandatoryUnassigned.map((person) => (
-                  <Paper
-                    key={person.id}
-                    draggable
-                    onDragStart={(event) =>
-                      handleDragStart(event, { personId: person.id, source: "unassigned" })
-                    }
-                    sx={{
-                      px: 2,
-                      py: isCollapsed ? 0.6 : 1,
-                      borderRight: "7px solid #0078D7",
-                      backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
-                      color: "common.black",
-                    }}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Box>
-                        <Typography variant="body1" sx={{ color: "common.black" }}>
-                          {person.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
-                          {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip
-                          label={person.nextDue ? formatDate(person.nextDue) : "no date"}
-                          size="small"
-                          sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
-                        />
-                        {pendingPersonIds.has(person.id) && (
-                          <CircularProgress size={12} sx={{ color: "common.black" }} />
-                        )}
-                      </Stack>
-                    </Stack>
-                    {!isCollapsed && (
-                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
-                        Home: {person.home} - last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "-"}
+              />
+              {mandatorySearch && (
+                <Button size="small" onClick={() => setMandatorySearch("")}>
+                  Clear
+                </Button>
+              )}
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Box
+              sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: "1fr",
+                maxHeight: { xs: 360, lg: 520 },
+                overflowY: "auto",
+                pr: 1,
+              }}
+            >
+              {mandatoryDisplayList.map((person) => (
+                <Paper
+                  key={person.id}
+                  draggable
+                  onDragStart={(event) =>
+                    handleDragStart(event, { personId: person.id, source: "unassigned" })
+                  }
+                  sx={{
+                    px: 2,
+                    py: isCollapsed ? 0.6 : 1,
+                    borderRight: "7px solid #0078D7",
+                    backgroundColor: homeColorMap.get(getHomeKey(person)) ?? "grey.600",
+                    color: "common.black",
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography variant="body1" sx={{ color: "common.black" }}>
+                        {person.name}
                       </Typography>
-                    )}
-                  </Paper>
-                ))}
-                {!mandatoryUnassigned.length && (
-                  <Typography color="text.secondary">Everyone has been allocated.</Typography>
-                )}
-              </Box>
-            </Paper>
+                      <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                        {person.role} - due {person.nextDue ? formatDate(person.nextDue) : "no date"}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip
+                        label={person.nextDue ? formatDate(person.nextDue) : "no date"}
+                        size="small"
+                        sx={{ bgcolor: "rgba(255,255,255,0.7)", color: "common.black" }}
+                      />
+                      {pendingPersonIds.has(person.id) && (
+                        <CircularProgress size={12} sx={{ color: "common.black" }} />
+                      )}
+                    </Stack>
+                  </Stack>
+                  {!isCollapsed && (
+                    <Typography variant="caption" sx={{ color: "common.black", opacity: 0.9 }}>
+                      Home: {person.home} - last training {person.lastTrainingAt ? formatDate(person.lastTrainingAt) : "-"}
+                    </Typography>
+                  )}
+                </Paper>
+              ))}
+              {!mandatoryDisplayList.length && (
+                <Typography color="text.secondary">
+                  {mandatoryUnassigned.length
+                    ? "No staff match the filters. Try showing all staff."
+                    : "Everyone has been allocated."}
+                </Typography>
+              )}
+            </Box>
+            <Box mt={1} sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button size="small" variant="text" onClick={() => setShowAllMandatory((prev) => !prev)}>
+                {showAllMandatory ? "Limit to staff due in 90 days" : "Show all staff"}
+              </Button>
+            </Box>
+          </Paper>
 
             <Paper
               sx={{

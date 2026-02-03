@@ -186,12 +186,12 @@ function AdminPage() {
   });
 
   useEffect(() => {
-    if (formDialogOpen && (createMutation.isSuccess || updateMutation.isSuccess)) {
+    if (createMutation.isSuccess || updateMutation.isSuccess) {
       handleCloseFormDialog();
       createMutation.reset();
       updateMutation.reset();
     }
-  }, [formDialogOpen, createMutation.isSuccess, updateMutation.isSuccess]);
+  }, [createMutation.isSuccess, updateMutation.isSuccess]);
 
   const deleteRequirementMutation = useMutation({
     mutationFn: (id: string) => deleteTrainingRequirement(id, role, userEmail),
@@ -527,7 +527,12 @@ function AdminPage() {
           sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
         >
           {editingId ? "Edit requirement" : "Define new requirement"}
-          <IconButton size="small" onClick={handleCloseFormDialog}>
+          <IconButton
+            size="small"
+            aria-label="Close dialog"
+            onClick={handleCloseFormDialog}
+            edge="end"
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
