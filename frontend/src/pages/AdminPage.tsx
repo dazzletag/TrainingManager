@@ -12,6 +12,7 @@ import {
   DialogTitle,
   FormControl,
   FormControlLabel,
+  InputAdornment,
   InputLabel,
   List,
   ListItem,
@@ -53,6 +54,7 @@ import {
 import { useUserContext } from "../context/UserContext";
 import { useEffect, useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SearchIcon from "@mui/icons-material/Search";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
@@ -121,6 +123,8 @@ function AdminPage() {
     queryKey: ["adminRequirementSections", role],
     queryFn: () => fetchRequirementSections(role, userEmail).then((response) => response.data.sections),
   });
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
   const createSectionMutation = useMutation({
     mutationFn: (name: string) => createRequirementSection({ name }, role, userEmail),
@@ -268,9 +272,15 @@ function AdminPage() {
       ...sectionsFromRequirements,
     ]),
   );
+  const filteredRequirements = normalizedSearchTerm
+    ? sortedRequirements.filter((item) => {
+        const haystack = `${item.name ?? ""} ${item.description ?? ""}`.toLowerCase();
+        return haystack.includes(normalizedSearchTerm);
+      })
+    : sortedRequirements;
   const sectionGroups = availableSections.map((label) => ({
     label,
-    items: sortedRequirements.filter((requirement: any) => getSectionLabel(requirement) === label),
+    items: filteredRequirements.filter((requirement: any) => getSectionLabel(requirement) === label),
   }));
 
   useEffect(() => {
@@ -337,6 +347,34 @@ function AdminPage() {
           <Typography variant="subtitle1" gutterBottom>
             Defined Requirements
           </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+              alignItems: "flex-end",
+              mb: 1,
+            }}
+          >
+            <TextField
+              size="small"
+              label="Search requirements"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            {searchTerm && (
+              <Button variant="text" onClick={() => setSearchTerm("")} sx={{ height: 40 }}>
+                Clear
+              </Button>
+            )}
+          </Box>
           {trainingRequirementsQuery.isLoading && <CircularProgress size={24} />}
           {sectionGroups.map((group) => (
             <Accordion
