@@ -394,8 +394,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         nextDue: trainingDates.nextDue,
         lastTrainingAt: trainingDates.lastTrainingAt,
       };
-    })
-    .filter((person) => person.status !== "compliant");
+    });
 
   const sortedUnassigned = unassigned.slice().sort((a, b) => {
     if (!a.nextDue && !b.nextDue) return 0;
