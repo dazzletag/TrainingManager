@@ -1,10 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
   FormControl,
   FormControlLabel,
+  InputLabel,
   List,
   ListItem,
   ListItemText,
@@ -41,13 +45,16 @@ import {
   updateRecommendationSettings,
 } from "../services/api";
 import { useUserContext } from "../context/UserContext";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
   2: "Nice to have",
   3: "Home compliance",
 };
+
+const defaultSections = ["SCTV", "Competencies", "Other"];
 
 const getDefaultFormValues = () => ({
   name: "",
@@ -59,6 +66,7 @@ const getDefaultFormValues = () => ({
   minimumAttendees: 8,
   enabled: true,
   roleExternalIds: [] as string[],
+  section: defaultSections[2],
 });
 type FormValues = ReturnType<typeof getDefaultFormValues>;
 
@@ -89,6 +97,21 @@ function AdminPage() {
       }
       return current;
     });
+  };
+  const [sections, setSections] = useState<string[]>(defaultSections);
+  const [sectionInput, setSectionInput] = useState("");
+  const handleAddSection = () => {
+    const trimmed = sectionInput.trim();
+    if (!trimmed) {
+      return;
+    }
+    setSections((prev) => {
+      if (prev.includes(trimmed)) {
+        return prev;
+      }
+      return [...prev, trimmed];
+    });
+    setSectionInput("");
   };
 
   const trainingRequirementsQuery = useQuery({
@@ -178,7 +201,8 @@ function AdminPage() {
     }));
   };
 
-  const sortedRequirements = [...(trainingRequirementsQuery.data?.requirements ?? [])].sort((a: any, b: any) => {
+  const requirements = trainingRequirementsQuery.data?.requirements ?? [];
+  const sortedRequirements = [...requirements].sort((a: any, b: any) => {
     const { key, direction } = sortState;
     const getValue = (item: any) => {
       switch (key) {
@@ -207,28 +231,21 @@ function AdminPage() {
     return 0;
   });
 
-  const requirementGroups = [
-    {
-      label: "SCTV",
-      items: sortedRequirements.filter((item: any) =>
-        String(item.name ?? "").toLowerCase().includes("sctv"),
-      ),
-    },
-    {
-      label: "Competencies",
-      items: sortedRequirements.filter((item: any) =>
-        String(item.name ?? "").toLowerCase().includes("competency"),
-      ),
-    },
-    {
-      label: "Other Courses",
-      items: sortedRequirements.filter(
-        (item: any) =>
-          !String(item.name ?? "").toLowerCase().includes("sctv") &&
-          !String(item.name ?? "").toLowerCase().includes("competency"),
-      ),
-    },
+  const getSectionLabel = (requirement: any): string => {
+    const raw = (requirement.section ?? defaultSections[2]).trim();
+    return raw || defaultSections[2];
+  };
+  const sectionsFromRequirements = Array.from(
+    new Set(requirements.map(getSectionLabel)),
+  ) as string[];
+  const availableSections: string[] = [
+    ...sections,
+    ...sectionsFromRequirements.filter((label) => !sections.includes(label)),
   ];
+  const sectionGroups = availableSections.map((label) => ({
+    label,
+    items: sortedRequirements.filter((requirement: any) => getSectionLabel(requirement) === label),
+  }));
 
   const handleSortChange = (key: string) => {
     setSortState((prev) => {
@@ -262,99 +279,102 @@ function AdminPage() {
 
       {tabIndex === 0 && (
         <Box mt={2}>
-          <Typography variant="subtitle1">Defined Requirements</Typography>
+          <Typography variant="subtitle1" gutterBottom>
+            Defined Requirements
+          </Typography>
           {trainingRequirementsQuery.isLoading && <CircularProgress size={24} />}
-          {trainingRequirementsQuery.data && (
-            <Table size="small" sx={{ mt: 1 }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>{renderSortLabel("Name", "name")}</TableCell>
-                  <TableCell>{renderSortLabel("Validity (months)", "validityPeriodMonths")}</TableCell>
-                  <TableCell>{renderSortLabel("Level", "requiredLevel")}</TableCell>
-                  <TableCell>{renderSortLabel("Category", "category")}</TableCell>
-                  <TableCell>{renderSortLabel("Importance", "importanceLevel")}</TableCell>
-                  <TableCell>{renderSortLabel("Min attendees", "minimumAttendees")}</TableCell>
-                  <TableCell>{renderSortLabel("Enabled", "enabled")}</TableCell>
-                  <TableCell>Roles</TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {requirementGroups.map((group) => (
-                  <Fragment key={group.label}>
-                    <TableRow>
-                      <TableCell colSpan={9} sx={{ bgcolor: "rgba(15, 98, 254, 0.08)" }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          {group.label}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                    {group.items.map((requirement: any) => (
-                      <TableRow key={requirement.id}>
-                        <TableCell>{requirement.name}</TableCell>
-                        <TableCell>{requirement.validityPeriodMonths}</TableCell>
-                        <TableCell>
-                          {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
-                        </TableCell>
-                        <TableCell>{requirement.category ?? "-"}</TableCell>
-                        <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
-                        <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
-                        <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
-                        <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                            <Button
-                              size="small"
-                              onClick={() => {
-                                setEditingId(requirement.id);
-                                setFormValues({
-                                  name: requirement.name ?? "",
-                                  description: requirement.description ?? "",
-                                  validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
-                                  requiredLevel: requirement.requiredLevel ?? 1,
-                                  category: requirement.category ?? "",
-                                  importanceLevel: requirement.importanceLevel ?? 3,
-                                  minimumAttendees: requirement.minimumAttendees ?? 8,
-                                  enabled: requirement.enabled ?? true,
-                                  roleExternalIds: requirement.roles.map((role: any) => role.externalId),
-                                });
-                              }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              disabled={deleteRequirementMutation.status === "pending"}
-                              onClick={() => {
-                                const confirmed = window.confirm(
-                                  `Delete “${requirement.name ?? "this requirement"}”? This will remove any evidence tied to it.`,
-                                );
-                                if (!confirmed) {
-                                  return;
-                                }
-                                deleteRequirementMutation.mutate(requirement.id);
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {!group.items.length && (
+          {sectionGroups.map((group) => (
+            <Accordion key={group.label} defaultExpanded disableGutters>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {group.label}
+                </Typography>
+                <Typography variant="caption" sx={{ ml: 1 }}>
+                  {group.items.length ? `${group.items.length} course${group.items.length > 1 ? "s" : ""}` : "empty"}
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 0 }}>
+                {group.items.length ? (
+                  <Table size="small">
+                    <TableHead>
                       <TableRow>
-                        <TableCell colSpan={9} sx={{ color: "text.secondary" }}>
-                          No courses in this section.
-                        </TableCell>
+                        <TableCell>{renderSortLabel("Name", "name")}</TableCell>
+                        <TableCell>{renderSortLabel("Validity (months)", "validityPeriodMonths")}</TableCell>
+                        <TableCell>{renderSortLabel("Level", "requiredLevel")}</TableCell>
+                        <TableCell>{renderSortLabel("Category", "category")}</TableCell>
+                        <TableCell>{renderSortLabel("Importance", "importanceLevel")}</TableCell>
+                        <TableCell>{renderSortLabel("Min attendees", "minimumAttendees")}</TableCell>
+                        <TableCell>{renderSortLabel("Enabled", "enabled")}</TableCell>
+                        <TableCell>Roles</TableCell>
+                        <TableCell />
                       </TableRow>
-                    )}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                    </TableHead>
+                    <TableBody>
+                      {group.items.map((requirement: any) => (
+                        <TableRow key={requirement.id}>
+                          <TableCell>{requirement.name}</TableCell>
+                          <TableCell>{requirement.validityPeriodMonths}</TableCell>
+                          <TableCell>
+                            {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
+                          </TableCell>
+                          <TableCell>{requirement.category ?? "-"}</TableCell>
+                          <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
+                          <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
+                          <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
+                          <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  setEditingId(requirement.id);
+                                  setFormValues({
+                                    name: requirement.name ?? "",
+                                    description: requirement.description ?? "",
+                                    validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
+                                    requiredLevel: requirement.requiredLevel ?? 1,
+                                    category: requirement.category ?? "",
+                                    importanceLevel: requirement.importanceLevel ?? 3,
+                                    minimumAttendees: requirement.minimumAttendees ?? 8,
+                                    enabled: requirement.enabled ?? true,
+                                    roleExternalIds: requirement.roles.map((role: any) => role.externalId),
+                                    section: getSectionLabel(requirement),
+                                  });
+                                }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                disabled={deleteRequirementMutation.status === "pending"}
+                                onClick={() => {
+                                  const confirmed = window.confirm(
+                                    `Delete “${requirement.name ?? "this requirement"}”? This will remove any evidence tied to it.`,
+                                  );
+                                  if (!confirmed) {
+                                    return;
+                                  }
+                                  deleteRequirementMutation.mutate(requirement.id);
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Alert severity="info" sx={{ m: 2 }}>
+                    No courses in this section.
+                  </Alert>
+                )}
+              </AccordionDetails>
+            </Accordion>
+          ))}
 
           {deleteRequirementMutation.isError && (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -366,6 +386,25 @@ function AdminPage() {
               Requirement deleted
             </Alert>
           )}
+
+          <Box mt={2} sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <TextField
+              label="New section"
+              size="small"
+              value={sectionInput}
+              onChange={(event) => setSectionInput(event.target.value)}
+            />
+            <Button
+              variant="outlined"
+              onClick={handleAddSection}
+              disabled={!sectionInput.trim()}
+            >
+              Add section
+            </Button>
+            <Typography variant="caption" sx={{ width: "100%" }}>
+              Sections: {availableSections.join(", ")}
+            </Typography>
+          </Box>
 
           <Box mt={3} component="form" autoComplete="off">
             <Typography variant="subtitle1" gutterBottom>
@@ -435,6 +474,22 @@ function AdminPage() {
                 value={formValues.category}
                 onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
               />
+              <FormControl fullWidth size="small">
+                <InputLabel>Section</InputLabel>
+                <Select
+                  value={formValues.section}
+                  label="Section"
+                  onChange={(event: SelectChangeEvent) =>
+                    setFormValues((prev) => ({ ...prev, section: event.target.value }))
+                  }
+                >
+                  {availableSections.map((label) => (
+                    <MenuItem key={label} value={label}>
+                      {label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 label="Description"
                 multiline

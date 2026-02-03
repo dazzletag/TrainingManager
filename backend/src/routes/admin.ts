@@ -99,6 +99,7 @@ router.post("/training-requirements", async (req, res) => {
     importanceLevel,
     minimumAttendees,
     enabled,
+    section,
   } = req.body;
 
   if (!name || !description || !validityPeriodMonths) {
@@ -122,6 +123,7 @@ router.post("/training-requirements", async (req, res) => {
     minimumAttendees: minimumAttendees ?? 8,
     enabled: enabled ?? true,
     roles,
+    section: section || null,
   });
 
   await requirementRepo.save(requirement);
@@ -147,6 +149,7 @@ router.put("/training-requirements/:id", async (req, res) => {
     importanceLevel,
     minimumAttendees,
     enabled,
+    section,
   } = req.body;
 
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
@@ -171,6 +174,10 @@ router.put("/training-requirements/:id", async (req, res) => {
       ? await roleRepo.find({ where: { externalId: In(roleExternalIds) } })
       : [];
     requirement.roles = roles;
+  }
+
+  if (section !== undefined) {
+    requirement.section = section || null;
   }
 
   await requirementRepo.save(requirement);

@@ -38,6 +38,9 @@ export class TrainingRequirement {
   @Column({ nullable: true })
   category?: string;
 
+  @Column({ nullable: true })
+  section?: string;
+
   @ManyToMany(() => Role, (role) => role.trainingRequirements, {
     cascade: ["insert"],
   })
