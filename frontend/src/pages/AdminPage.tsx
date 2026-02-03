@@ -6,6 +6,10 @@ import {
   Alert,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -87,20 +91,30 @@ function AdminPage() {
     minimumAttendeesDefault: 8,
     importanceWeightMultiplier: 2,
   });
-  const clearForm = () => {
-    setFormValues(getDefaultFormValues());
-    setEditingId(null);
-  };
   const clearFormIfEditing = (targetId: string) => {
     setEditingId((current) => {
       if (current === targetId) {
         setFormValues(getDefaultFormValues());
+        setFormDialogOpen(false);
         return null;
       }
       return current;
     });
   };
   const [sectionInput, setSectionInput] = useState("");
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const resetForm = () => {
+    setFormValues(getDefaultFormValues());
+    setEditingId(null);
+  };
+  const handleOpenFormDialog = () => {
+    resetForm();
+    setFormDialogOpen(true);
+  };
+  const handleCloseFormDialog = () => {
+    resetForm();
+    setFormDialogOpen(false);
+  };
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
   const sectionsQuery = useQuery({
@@ -386,6 +400,7 @@ function AdminPage() {
                                     roleExternalIds: requirement.roles.map((role: any) => role.externalId),
                                     section: getSectionLabel(requirement),
                                   });
+                                  setFormDialogOpen(true);
                                 }}
                               >
                                 Edit
@@ -452,168 +467,166 @@ function AdminPage() {
             </Typography>
           </Box>
 
-          <Box mt={3} component="form" autoComplete="off">
-            <Typography variant="subtitle1" gutterBottom>
+          <Box mt={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button variant="contained" onClick={handleOpenFormDialog}>
               Define new requirement
-            </Typography>
-            <Box
-              sx={{
-                display: "grid",
-                gap: 2,
-                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-                mt: 1,
-              }}
-            >
-              <TextField
-                label="Name"
-                fullWidth
-                size="small"
-                value={formValues.name}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, name: event.target.value }))}
-              />
-              <TextField
-                label="Validity (months)"
-                fullWidth
-                size="small"
-                type="number"
-                value={formValues.validityPeriodMonths}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, validityPeriodMonths: Number(event.target.value) }))
-                }
-              />
-              <TextField
-                label="Required Level (1 essential, 2 nice to have, 3 home compliance)"
-                fullWidth
-                size="small"
-                type="number"
-                value={formValues.requiredLevel}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, requiredLevel: Number(event.target.value) }))
-                }
-              />
-              <TextField
-                label="Importance level (1 low, 5 critical)"
-                fullWidth
-                size="small"
-                type="number"
-                inputProps={{ min: 1, max: 5 }}
-                value={formValues.importanceLevel}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, importanceLevel: Number(event.target.value) }))
-                }
-              />
-              <TextField
-                label="Minimum attendees"
-                fullWidth
-                size="small"
-                type="number"
-                inputProps={{ min: 1 }}
-                value={formValues.minimumAttendees}
-                onChange={(event) =>
-                  setFormValues((prev) => ({ ...prev, minimumAttendees: Number(event.target.value) }))
-                }
-              />
-              <TextField
-                label="Category (e.g. one-off)"
-                fullWidth
-                size="small"
-                value={formValues.category}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
-              />
-              <FormControl fullWidth size="small">
-                <InputLabel>Section</InputLabel>
-                <Select
-                  value={formValues.section}
-                  label="Section"
-                  onChange={(event: SelectChangeEvent) =>
-                    setFormValues((prev) => ({ ...prev, section: event.target.value }))
-                  }
-                >
-                  {availableSections.map((label) => (
-                    <MenuItem key={label} value={label}>
-                      {label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Description"
-                multiline
-                rows={3}
-                fullWidth
-                size="small"
-                sx={{ gridColumn: "1 / -1" }}
-                value={formValues.description}
-                onChange={(event) => setFormValues((prev) => ({ ...prev, description: event.target.value }))}
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formValues.enabled}
-                    onChange={(event) => setFormValues((prev) => ({ ...prev, enabled: event.target.checked }))}
-                  />
-                }
-                label="Enabled for recommendations"
-              />
-              <FormControl fullWidth size="small">
-                <Select
-                  multiple
-                  displayEmpty
-                  value={formValues.roleExternalIds}
-                  onChange={handleRoleSelection}
-                  renderValue={(selected) =>
-                    selected.length ? selected.join(", ") : "Select roles (from Planday sync results)"
-                  }
-                >
-                  {rolesQuery.data?.roles.map((roleOption: any) => (
-                    <MenuItem key={roleOption.id} value={roleOption.externalId}>
-                      {roleOption.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Box sx={{ gridColumn: "1 / -1", display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                <Button
-                  variant="contained"
-                  disabled={createMutation.status === "pending" || updateMutation.status === "pending"}
-                  onClick={() => {
-                    const payload = {
-                      name: formValues.name,
-                      description: formValues.description,
-                      validityPeriodMonths: formValues.validityPeriodMonths,
-                      requiredLevel: formValues.requiredLevel,
-                      category: formValues.category,
-                      importanceLevel: formValues.importanceLevel,
-                      minimumAttendees: formValues.minimumAttendees,
-                      enabled: formValues.enabled,
-                      roleExternalIds: formValues.roleExternalIds,
-                      section: formValues.section,
-                    };
-                    if (editingId) {
-                      updateMutation.mutate({ id: editingId, body: payload });
-                    } else {
-                      createMutation.mutate(payload);
-                    }
-                  }}
-                >
-                  {editingId ? "Update requirement" : "Save requirement"}
-                </Button>
-                {editingId && (
-                  <Button
-                    variant="text"
-                    onClick={clearForm}
-                  >
-                    Cancel
-                  </Button>
-                )}
-                {createMutation.isError && <Alert severity="error">Unable to persist requirement</Alert>}
-                {createMutation.isSuccess && <Alert severity="success">Requirement saved</Alert>}
-                {updateMutation.isSuccess && <Alert severity="success">Requirement updated</Alert>}
-              </Box>
-            </Box>
+            </Button>
           </Box>
         </Box>
       )}
+      <Dialog open={formDialogOpen} onClose={handleCloseFormDialog} fullWidth maxWidth="md">
+        <DialogTitle>{editingId ? "Edit requirement" : "Define new requirement"}</DialogTitle>
+        <DialogContent dividers>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 2,
+              gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+              mt: 1,
+            }}
+          >
+            <TextField
+              label="Name"
+              fullWidth
+              size="small"
+              value={formValues.name}
+              onChange={(event) => setFormValues((prev) => ({ ...prev, name: event.target.value }))}
+            />
+            <TextField
+              label="Validity (months)"
+              fullWidth
+              size="small"
+              type="number"
+              value={formValues.validityPeriodMonths}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, validityPeriodMonths: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Required Level (1 essential, 2 nice to have, 3 home compliance)"
+              fullWidth
+              size="small"
+              type="number"
+              value={formValues.requiredLevel}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, requiredLevel: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Importance level (1 low, 5 critical)"
+              fullWidth
+              size="small"
+              type="number"
+              inputProps={{ min: 1, max: 5 }}
+              value={formValues.importanceLevel}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, importanceLevel: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Minimum attendees"
+              fullWidth
+              size="small"
+              type="number"
+              inputProps={{ min: 1 }}
+              value={formValues.minimumAttendees}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, minimumAttendees: Number(event.target.value) }))
+              }
+            />
+            <TextField
+              label="Category (e.g. one-off)"
+              fullWidth
+              size="small"
+              value={formValues.category}
+              onChange={(event) => setFormValues((prev) => ({ ...prev, category: event.target.value }))}
+            />
+            <FormControl fullWidth size="small">
+              <InputLabel>Section</InputLabel>
+              <Select
+                value={formValues.section}
+                label="Section"
+                onChange={(event: SelectChangeEvent) =>
+                  setFormValues((prev) => ({ ...prev, section: event.target.value }))
+                }
+              >
+                {availableSections.map((label) => (
+                  <MenuItem key={label} value={label}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Description"
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+              sx={{ gridColumn: "1 / -1" }}
+              value={formValues.description}
+              onChange={(event) => setFormValues((prev) => ({ ...prev, description: event.target.value }))}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formValues.enabled}
+                  onChange={(event) => setFormValues((prev) => ({ ...prev, enabled: event.target.checked }))}
+                />
+              }
+              label="Enabled for recommendations"
+            />
+            <FormControl fullWidth size="small">
+              <Select
+                multiple
+                displayEmpty
+                value={formValues.roleExternalIds}
+                onChange={handleRoleSelection}
+                renderValue={(selected) =>
+                  selected.length ? selected.join(", ") : "Select roles (from Planday sync results)"
+                }
+              >
+                {rolesQuery.data?.roles.map((roleOption: any) => (
+                  <MenuItem key={roleOption.id} value={roleOption.externalId}>
+                    {roleOption.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseFormDialog}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={createMutation.status === "pending" || updateMutation.status === "pending"}
+            onClick={() => {
+              const payload = {
+                name: formValues.name,
+                description: formValues.description,
+                validityPeriodMonths: formValues.validityPeriodMonths,
+                requiredLevel: formValues.requiredLevel,
+                category: formValues.category,
+                importanceLevel: formValues.importanceLevel,
+                minimumAttendees: formValues.minimumAttendees,
+                enabled: formValues.enabled,
+                roleExternalIds: formValues.roleExternalIds,
+                section: formValues.section,
+              };
+              if (editingId) {
+                updateMutation.mutate({ id: editingId, body: payload });
+              } else {
+                createMutation.mutate(payload);
+              }
+            }}
+          >
+            {editingId ? "Update requirement" : "Save requirement"}
+          </Button>
+        </DialogActions>
+        {createMutation.isError && <Alert severity="error">Unable to persist requirement</Alert>}
+        {createMutation.isSuccess && <Alert severity="success">Requirement saved</Alert>}
+        {updateMutation.isSuccess && <Alert severity="success">Requirement updated</Alert>}
+      </Dialog>
 
       {tabIndex === 1 && (
         <Box mt={2}>
