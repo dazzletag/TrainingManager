@@ -16,3 +16,4 @@ frontend-package.zip
 backend-deploy.zip
 frontend-deploy.zip
 frontend-logs*
+.deploy/

@@ -11,6 +11,7 @@ import { In } from "typeorm";
 import { coerceRecommendationSettings, getRecommendationSettings } from "../services/recommendationSettings";
 import { Assignment } from "../entities/Assignment";
 import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
+import { TrainingRequirementSuppression } from "../entities/TrainingRequirementSuppression";
 
 const router = Router();
 
@@ -85,7 +86,18 @@ router.delete("/users/:id", async (req, res) => {
 
 router.get("/training-requirements", async (req, res) => {
   const repo = AppDataSource.getRepository(TrainingRequirement);
-  const requirements = await repo.find({ relations: ["roles"] });
+  const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
+  const suppressedEntries = await suppressionRepo.find();
+  const suppressedNames = new Set(suppressedEntries.map((entry) => entry.name));
+  const suppressedFieldIds = new Set(
+    suppressedEntries.map((entry) => entry.fieldIdentifier).filter((value): value is string => Boolean(value)),
+  );
+  const requirements = (await repo.find({ relations: ["roles"] })).filter((requirement) => {
+    const nameBlocked = suppressedNames.has(requirement.name);
+    const fieldBlocked =
+      requirement.fieldIdentifier && suppressedFieldIds.has(requirement.fieldIdentifier);
+    return !nameBlocked && !fieldBlocked;
+  });
   res.json({ requirements });
 });
 
@@ -133,6 +145,7 @@ router.post("/training-requirements", async (req, res) => {
 
   const roleRepo = AppDataSource.getRepository(Role);
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
 
   const roles = roleExternalIds?.length
     ? await roleRepo.find({ where: { externalId: In(roleExternalIds) } })
@@ -179,6 +192,7 @@ router.put("/training-requirements/:id", async (req, res) => {
 
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
   const roleRepo = AppDataSource.getRepository(Role);
+  const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
 
   const requirement = await requirementRepo.findOne({ where: { id }, relations: ["roles"] });
   if (!requirement) {
@@ -205,7 +219,16 @@ router.put("/training-requirements/:id", async (req, res) => {
     requirement.section = section || null;
   }
 
+  if (requirement.fieldIdentifier) {
+    await suppressionRepo.delete({ fieldIdentifier: requirement.fieldIdentifier });
+  }
+  await suppressionRepo.delete({ name: requirement.name });
   await requirementRepo.save(requirement);
+
+  if (requirement.fieldIdentifier) {
+    await suppressionRepo.delete({ fieldIdentifier: requirement.fieldIdentifier });
+  }
+  await suppressionRepo.delete({ name: requirement.name });
 
   await logAudit({
     who: req.user?.email ?? "system",
@@ -224,6 +247,7 @@ router.delete("/training-requirements/:id", async (req, res) => {
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
   const assignmentRepo = AppDataSource.getRepository(Assignment);
   const evidenceRepo = AppDataSource.getRepository(Evidence);
+  const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
 
   const requirement = await requirementRepo.findOne({ where: { id } });
   if (!requirement) {
@@ -247,6 +271,16 @@ router.delete("/training-requirements/:id", async (req, res) => {
       .execute();
   }
 
+  await suppressionRepo.delete({ name: requirement.name });
+  if (requirement.fieldIdentifier) {
+    await suppressionRepo.delete({ fieldIdentifier: requirement.fieldIdentifier });
+  }
+  await suppressionRepo.save(
+    suppressionRepo.create({
+      name: requirement.name,
+      fieldIdentifier: requirement.fieldIdentifier ?? null,
+    }),
+  );
   await requirementRepo.delete({ id });
 
   await logAudit({

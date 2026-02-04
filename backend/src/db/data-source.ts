@@ -56,6 +56,7 @@ export const AppDataSource = new DataSource({
     RecommendationSettings,
     TrainingUnavailability,
     TrainingRequirementSection,
+    TrainingRequirementSuppression,
   ],
   migrations: [__dirname + "/migrations/*.{ts,js}"],
   options: {

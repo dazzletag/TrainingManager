@@ -910,10 +910,23 @@ def main() -> int:
             "category": row.category,
             "fieldIdentifier": row.fieldIdentifier,
         }
-        requirements_by_name[row.name] = entry
-        field_id = row.fieldIdentifier or row.name
-        if field_id:
-            requirements_by_field_identifier[field_id] = entry
+    requirements_by_name[row.name] = entry
+    field_id = row.fieldIdentifier or row.name
+    if field_id:
+        requirements_by_field_identifier[field_id] = entry
+
+    suppressed_field_identifiers: set[str] = set()
+    suppressed_names: set[str] = set()
+    try:
+        cursor.execute("SELECT fieldIdentifier, name FROM training_requirement_suppression")
+        for row in cursor.fetchall():
+            field_identifier_value = getattr(row, "fieldIdentifier", None)
+            if field_identifier_value:
+                suppressed_field_identifiers.add(str(field_identifier_value))
+            if row.name:
+                suppressed_names.add(str(row.name))
+    except pyodbc.Error:
+        pass
 
     evidence_by_key: Dict[Tuple[str, str], str] = {}
     cursor.execute(
@@ -1042,6 +1055,11 @@ def main() -> int:
                 if not metadata:
                     continue
                 canonical_name = metadata.get("canonical_name", canonical_name)
+                if (
+                    (field_identifier and field_identifier in suppressed_field_identifiers)
+                    or canonical_name in suppressed_names
+                ):
+                    continue
                 period_years = metadata.get("period_years", 0)
                 is_one_off = period_years in ONE_OFF_YEARS
                 validity_months = validity_overrides.get(
