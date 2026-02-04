@@ -1,18 +1,18 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from " typeorm\;
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from "typeorm";
 
-@Entity(\training_requirement_suppression\)
+@Entity("training_requirement_suppression")
 export class TrainingRequirementSuppression {
- @PrimaryGeneratedColumn(\uuid\)
- id!: string;
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
 
- @Column({ nullable: true })
- @Index()
- fieldIdentifier?: string;
+  @Column({ nullable: true })
+  @Index()
+  fieldIdentifier?: string;
 
- @Column()
- @Index()
- name!: string;
+  @Column()
+  @Index()
+  name!: string;
 
- @CreateDateColumn()
- createdAt!: Date;
+  @CreateDateColumn()
+  createdAt!: Date;
 }
