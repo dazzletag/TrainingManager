@@ -617,12 +617,11 @@ function TrainingSessionBuilder() {
     }
   };
 
-  const removeAssignmentsForPerson = async (sessionId: string, personId: string) => {
+  const removeAssignmentsForPerson = async (sessionId: string, personId: string, day?: number) => {
     const session = sessions.find((entry) => entry.id === sessionId);
     if (!session) return;
-    const assignments = [...session.day1Assignments, ...session.day2Assignments].filter(
-      (assignment) => assignment.person.id === personId,
-    );
+    const bucket = day === 2 ? session.day2Assignments : day === 1 ? session.day1Assignments : [...session.day1Assignments, ...session.day2Assignments];
+    const assignments = bucket.filter((assignment) => assignment.person.id === personId);
     if (!assignments.length) return;
     await Promise.all(assignments.map((assignment) => removeMutation.mutateAsync(assignment.id)));
   };
@@ -633,7 +632,7 @@ function TrainingSessionBuilder() {
     if (!payload) return;
 
     if (payload.sourceSessionId && payload.sourceSessionId !== sessionId) {
-      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId);
+      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId, payload.day);
     }
 
     const dropZoneId = `session-${sessionId}-day-${day}-${payload.personId}-${Date.now()}`;
@@ -656,7 +655,7 @@ function TrainingSessionBuilder() {
     }
 
     if (payload.sourceSessionId) {
-      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId);
+      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId, payload.day);
     }
   };
 
