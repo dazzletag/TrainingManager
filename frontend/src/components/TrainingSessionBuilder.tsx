@@ -650,13 +650,13 @@ function TrainingSessionBuilder() {
       return;
     }
 
-    if (payload.sourceSessionId) {
-      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId);
+    if (payload.assignmentId) {
+      removeMutation.mutate(payload.assignmentId);
       return;
     }
 
-    if (payload.assignmentId) {
-      removeMutation.mutate(payload.assignmentId);
+    if (payload.sourceSessionId) {
+      await removeAssignmentsForPerson(payload.sourceSessionId, payload.personId);
     }
   };
 
