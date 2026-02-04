@@ -278,7 +278,7 @@ router.delete("/training-requirements/:id", async (req, res) => {
   await suppressionRepo.save(
     suppressionRepo.create({
       name: requirement.name,
-      fieldIdentifier: requirement.fieldIdentifier ?? null,
+      fieldIdentifier: requirement.fieldIdentifier ?? undefined,
     }),
   );
   await requirementRepo.delete({ id });

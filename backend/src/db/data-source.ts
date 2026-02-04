@@ -14,6 +14,7 @@ import { AppUser } from "../entities/AppUser";
 import { RecommendationSettings } from "../entities/RecommendationSettings";
 import { TrainingUnavailability } from "../entities/TrainingUnavailability";
 import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
+import { TrainingRequirementSuppression } from "../entities/TrainingRequirementSuppression";
 
 dotenv.config();
 
