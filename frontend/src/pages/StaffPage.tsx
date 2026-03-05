@@ -292,13 +292,22 @@ function StaffPage() {
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6">Upload Evidence</Typography>
         <Stack component="form" spacing={2} mt={2}>
-          <TextField
-            label="Requirement ID"
-            value={form.requirementId}
-            onChange={(event) => setForm((prev) => ({ ...prev, requirementId: event.target.value }))}
-            helperText="Copy requirement UUID from the table above"
-            size="small"
-          />
+          <FormControl size="small" fullWidth>
+            <InputLabel id="requirement-select-label">Requirement</InputLabel>
+            <Select
+              labelId="requirement-select-label"
+              label="Requirement"
+              value={form.requirementId}
+              onChange={(event) => setForm((prev) => ({ ...prev, requirementId: event.target.value }))}
+              disabled={!requirements.length}
+            >
+              {requirements.map((item: any) => (
+                <MenuItem key={item.requirement.id} value={item.requirement.id}>
+                  {item.requirement.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
             label="Type"
             value={form.type}
