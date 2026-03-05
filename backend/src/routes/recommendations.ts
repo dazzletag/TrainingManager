@@ -55,6 +55,7 @@ router.get("/next-courses", async (req, res) => {
       AND tr.name <> 'Care Certificate'
       AND tr.name <> 'Mandatory Training'
       AND tr.name <> 'Level 3 Lead Adult Care'
+      AND tr.name NOT LIKE '% next due%'
       ${requiredLevelFilter ? "AND tr.requiredLevel = " + requiredLevelFilter : ""};
   `);
 
