@@ -109,23 +109,23 @@ export default function ReportingPage() {
   }, [homeFilter, roleFilters, importanceFilters, courseKeywordFilters]);
 
   const summaryQuery = useQuery({
-    queryKey: ["reportingSummary"],
-    queryFn: () => fetchReportingSummary().then((response) => response.data),
+    queryKey: ["reportingSummary", filters],
+    queryFn: () => fetchReportingSummary(filters).then((response) => response.data),
   });
 
   const complianceQuery = useQuery({
-    queryKey: ["reportingCompliance"],
-    queryFn: () => fetchReportingCompliance().then((response) => response.data),
+    queryKey: ["reportingCompliance", filters],
+    queryFn: () => fetchReportingCompliance(filters).then((response) => response.data),
   });
 
   const forecastQuery = useQuery({
-    queryKey: ["reportingForecast"],
-    queryFn: () => fetchReportingForecast().then((response) => response.data),
+    queryKey: ["reportingForecast", filters],
+    queryFn: () => fetchReportingForecast(filters).then((response) => response.data),
   });
 
   const utilisationQuery = useQuery({
-    queryKey: ["reportingUtilisation"],
-    queryFn: () => fetchReportingUtilisation().then((response) => response.data),
+    queryKey: ["reportingUtilisation", filters],
+    queryFn: () => fetchReportingUtilisation(filters).then((response) => response.data),
   });
 
   const matrixQuery = useQuery({
