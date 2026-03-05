@@ -391,6 +391,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         home: person.homeLocation,
         primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
         role: person.role.name,
+        roleExternalId: person.role.externalId,
         employmentStatus: person.employmentStatus,
         nextDue: trainingDates.nextDue,
         lastTrainingAt: trainingDates.lastTrainingAt,
@@ -554,7 +555,7 @@ router.post("/sessions/:sessionId/recommend", async (req, res) => {
   const employees: RecommendInput[] = unassigned.map((person) => ({
     employee_number: person.externalId,
     home: person.home,
-    role_type: resolveRoleType(person.role),
+    role_type: resolveRoleType(person.roleExternalId),
     last_completed_date: person.lastTrainingAt ? person.lastTrainingAt.split("T")[0] : undefined,
   }));
 
