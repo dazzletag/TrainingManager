@@ -12,6 +12,7 @@ import { coerceRecommendationSettings, getRecommendationSettings } from "../serv
 import { Assignment } from "../entities/Assignment";
 import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
 import { TrainingRequirementSuppression } from "../entities/TrainingRequirementSuppression";
+import { isNextDueRequirement } from "../services/requirementUtils";
 
 const router = Router();
 
@@ -96,7 +97,7 @@ router.get("/training-requirements", async (req, res) => {
     const nameBlocked = suppressedNames.has(requirement.name);
     const fieldBlocked =
       requirement.fieldIdentifier && suppressedFieldIds.has(requirement.fieldIdentifier);
-    return !nameBlocked && !fieldBlocked;
+    return !nameBlocked && !fieldBlocked && !isNextDueRequirement(requirement.name);
   });
   res.json({ requirements });
 });
