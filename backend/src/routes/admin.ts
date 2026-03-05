@@ -225,11 +225,6 @@ router.put("/training-requirements/:id", async (req, res) => {
   await suppressionRepo.delete({ name: requirement.name });
   await requirementRepo.save(requirement);
 
-  if (requirement.fieldIdentifier) {
-    await suppressionRepo.delete({ fieldIdentifier: requirement.fieldIdentifier });
-  }
-  await suppressionRepo.delete({ name: requirement.name });
-
   await logAudit({
     who: req.user?.email ?? "system",
     what: "training-requirement-updated",
