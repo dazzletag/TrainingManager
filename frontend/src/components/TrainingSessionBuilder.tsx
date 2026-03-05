@@ -136,13 +136,19 @@ const MS_IN_DAY = 1000 * 60 * 60 * 24;
 const DUE_WINDOW_DAYS = 90;
 const DUE_WINDOW_MS = DUE_WINDOW_DAYS * MS_IN_DAY;
 
-function TrainingSessionBuilder() {
+type TrainingSessionBuilderProps = {
+  requirementId?: string;
+  requirementName?: string;
+};
+
+function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSessionBuilderProps = {}) {
   const { role, userEmail } = useUserContext();
   const queryClient = useQueryClient();
-  const overviewKey = ["schedulerOverview", role];
+  const overviewKey = ["schedulerOverview", role, requirementId ?? "mandatory"];
+  const defaultType = requirementName ?? "Mandatory Training";
   const [form, setForm] = useState({
     name: "",
-    type: "Mandatory Training",
+    type: defaultType,
     day1: "",
     day2: "",
     day1StartTime: "09:15",
@@ -161,7 +167,7 @@ function TrainingSessionBuilder() {
 
   const overviewQuery = useQuery({
     queryKey: overviewKey,
-    queryFn: () => fetchSchedulerOverview(role, userEmail).then((response) => response.data),
+    queryFn: () => fetchSchedulerOverview(role, userEmail, requirementId ? { requirementId } : undefined).then((response) => response.data),
   });
 
   const sessions: SessionOverview[] = overviewQuery.data?.overview ?? [];
@@ -525,10 +531,10 @@ function TrainingSessionBuilder() {
     mutationFn: (payload: { name: string; type: string; day1: string; day2: string; day1StartTime: string; day1EndTime: string; day2StartTime: string; day2EndTime: string }) =>
       createTrainingSession(payload, role, userEmail),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["schedulerOverview", role] });
+      queryClient.invalidateQueries({ queryKey: overviewKey });
       setForm({
         name: "",
-        type: "Mandatory Training",
+        type: defaultType,
         day1: "",
         day2: "",
         day1StartTime: "09:15",
@@ -831,7 +837,7 @@ function TrainingSessionBuilder() {
       <Paper sx={{ p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
           <Box>
-            <Typography variant="h6">Mandatory training sessions</Typography>
+            <Typography variant="h6">{defaultType} sessions</Typography>
             <Typography variant="body2" color="text.secondary">
               Drag staff between sessions to rebalance the plan. Drop cards back on the left to unassign.
             </Typography>

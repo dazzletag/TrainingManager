@@ -156,9 +156,10 @@ export function deleteAdminUser(id: string, role: string, email: string) {
   });
 }
 
-export function fetchSchedulerOverview(role: string, email: string) {
+export function fetchSchedulerOverview(role: string, email: string, params?: { requirementId?: string }) {
   return apiClient.get("/scheduler/overview", {
     headers: withHeaders(role, email),
+    params,
   });
 }
 

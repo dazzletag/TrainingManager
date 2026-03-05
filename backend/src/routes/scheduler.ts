@@ -194,7 +194,7 @@ function toIsoString(value?: Date | string | null) {
   return date.toISOString();
 }
 
-async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassigned: any[]; unavailable: any[] }> {
+async function buildSchedulerOverviewData(requirementId?: string): Promise<{ overview: any[]; unassigned: any[]; unavailable: any[] }> {
   const sessionRepo = AppDataSource.getRepository(TrainingSession);
   const personRepo = AppDataSource.getRepository(Person);
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
@@ -202,9 +202,9 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
   const assignmentRepo = AppDataSource.getRepository(Assignment);
   const unavailabilityRepo = AppDataSource.getRepository(TrainingUnavailability);
 
-  const mandatoryRequirement = await requirementRepo.findOne({
-    where: { name: "Mandatory Training" },
-  });
+  const mandatoryRequirement = requirementId
+    ? await requirementRepo.findOne({ where: { id: requirementId } })
+    : await requirementRepo.findOne({ where: { name: "Mandatory Training" } });
   if (!mandatoryRequirement) {
     return { overview: [], unassigned: [], unavailable: [] };
   }
@@ -422,8 +422,9 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
   return { overview, unassigned: normalizedUnassigned, unavailable };
 }
 
-router.get("/overview", async (_req, res) => {
-  const data = await buildSchedulerOverviewData();
+router.get("/overview", async (req, res) => {
+  const requirementId = typeof req.query.requirementId === "string" ? req.query.requirementId : undefined;
+  const data = await buildSchedulerOverviewData(requirementId);
   res.json(data);
 });
 
@@ -531,7 +532,9 @@ router.post("/sessions/:sessionId/recommend", async (req, res) => {
     return res.status(404).json({ message: "Session not found" });
   }
 
-  const { unassigned } = await buildSchedulerOverviewData();
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const sessionRequirement = await requirementRepo.findOne({ where: { name: session.type } });
+  const { unassigned } = await buildSchedulerOverviewData(sessionRequirement?.id);
   const unassignedByExternalId = new Map(unassigned.map((person) => [person.externalId, person]));
 
   const employees: RecommendInput[] = unassigned.map((person) => ({
