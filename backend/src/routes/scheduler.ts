@@ -34,24 +34,6 @@ function isExcludedPerson(person: Person) {
   );
 }
 
-const carePaycodes = new Set([
-  "C1",
-  "C2",
-  "C3",
-  "C5",
-  "TL1",
-  "TL3",
-  "TL4",
-  "NA1",
-  "N1",
-  "N3",
-  "N4",
-]);
-
-function resolveRoleType(paycode?: string) {
-  const code = paycode?.trim().toUpperCase();
-  return code && carePaycodes.has(code) ? "care" : "ancillary";
-}
 
 function resolvePrimaryDepartmentId(home?: string): string | undefined {
   switch ((home ?? "").trim()) {
@@ -391,7 +373,7 @@ async function buildSchedulerOverviewData(): Promise<{ overview: any[]; unassign
         home: person.homeLocation,
         primaryDepartmentId: resolvePrimaryDepartmentId(person.homeLocation),
         role: person.role.name,
-        roleExternalId: person.role.externalId,
+        roleCategory: person.role.category,
         employmentStatus: person.employmentStatus,
         nextDue: trainingDates.nextDue,
         lastTrainingAt: trainingDates.lastTrainingAt,
@@ -555,7 +537,7 @@ router.post("/sessions/:sessionId/recommend", async (req, res) => {
   const employees: RecommendInput[] = unassigned.map((person) => ({
     employee_number: person.externalId,
     home: person.home,
-    role_type: resolveRoleType(person.roleExternalId),
+    role_type: person.roleCategory,
     last_completed_date: person.lastTrainingAt ? person.lastTrainingAt.split("T")[0] : undefined,
   }));
 
