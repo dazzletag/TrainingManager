@@ -210,6 +210,7 @@ async function buildSchedulerOverviewData(requirementId?: string): Promise<{ ove
   }
 
   const sessions = await sessionRepo.find({
+    where: { type: mandatoryRequirement.name },
     relations: {
       assignments: {
         person: {
