@@ -51,6 +51,7 @@ const historyFieldLabels: Record<string, string> = {
   "/title": "Job Title",
   "/position": "Position",
   "/employeeGroupId": "Employee Group",
+  "/employeeTypeId": "Employee Type",
   "/department": "Department",
   "/contractRule": "Contract Rule",
   "/employmentStatus": "Employment Status",

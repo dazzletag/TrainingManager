@@ -264,6 +264,24 @@ router.post("/:personId/evidence", async (req, res) => {
   res.status(201).json({ evidence });
 });
 
+type EmployeeType = { id: number; name: string; description?: string };
+let cachedEmployeeTypes: Map<number, string> | null = null;
+let employeeTypesCachedAt = 0;
+const EMPLOYEE_TYPES_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function getEmployeeTypeMap(headers: Record<string, string>): Promise<Map<number, string>> {
+  if (cachedEmployeeTypes && Date.now() - employeeTypesCachedAt < EMPLOYEE_TYPES_TTL_MS) {
+    return cachedEmployeeTypes;
+  }
+  const response = await plandayHrClient.get<{ data: EmployeeType[] }>("/employeetypes", { headers });
+  const map = new Map<number, string>(
+    (response.data.data ?? []).map((t) => [t.id, t.name]),
+  );
+  cachedEmployeeTypes = map;
+  employeeTypesCachedAt = Date.now();
+  return map;
+}
+
 router.get("/employees/:externalId/history", async (req, res) => {
   const { externalId } = req.params;
   const { startDateTime, endDateTime, offset, limit } = req.query;
@@ -278,12 +296,27 @@ router.get("/employees/:externalId/history", async (req, res) => {
     if (startDateTime) params.startDateTime = startDateTime;
     if (endDateTime) params.endDateTime = endDateTime;
 
-    const response = await plandayHrClient.get(`/employees/${externalId}/history`, {
-      headers,
-      params,
+    const [historyResponse, employeeTypeMap] = await Promise.all([
+      plandayHrClient.get(`/employees/${externalId}/history`, { headers, params }),
+      getEmployeeTypeMap(headers),
+    ]);
+
+    const data = (historyResponse.data.data ?? []).map((entry: any) => {
+      if (
+        typeof entry.path === "string" &&
+        entry.path.toLowerCase().includes("employeetypeid") &&
+        entry.value !== undefined &&
+        entry.value !== null
+      ) {
+        const resolved = employeeTypeMap.get(Number(entry.value));
+        if (resolved) {
+          return { ...entry, value: resolved };
+        }
+      }
+      return entry;
     });
 
-    res.json(response.data);
+    res.json({ ...historyResponse.data, data });
   } catch (error: any) {
     if (error.response?.status === 404) {
       return res.status(404).json({ message: "Employee not found in Planday" });
