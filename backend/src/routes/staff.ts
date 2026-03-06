@@ -345,8 +345,6 @@ router.get("/employees/:externalId/wage-history", async (req, res) => {
 
     const groupExternalIds = Array.from(new Set(rawGroups.map(String).filter(Boolean)));
 
-    console.log(`[wage-history] employee=${externalId} groups=[${groupExternalIds.join(",")}]`);
-
     const results = await Promise.allSettled(
       groupExternalIds.map((groupId) =>
         plandayPayClient.get(
@@ -356,25 +354,13 @@ router.get("/employees/:externalId/wage-history", async (req, res) => {
       ),
     );
 
-    results.forEach((result, i) => {
-      if (result.status === "rejected") {
-        const err = result.reason;
-        console.warn(
-          `[wage-history] group=${groupExternalIds[i]} failed: ${err?.response?.status ?? err?.message}`,
-          err?.response?.data ?? "",
-        );
-      } else {
-        console.log(
-          `[wage-history] group=${groupExternalIds[i]} ok: ${JSON.stringify(result.value.data).slice(0, 200)}`,
-        );
-      }
+    const allEntries = results.flatMap((result) => {
+      if (result.status !== "fulfilled") return [];
+      const body = result.value.data;
+      const entries = body?.data ?? body;
+      return Array.isArray(entries) ? entries : [];
     });
 
-    const allEntries = results.flatMap((result) =>
-      result.status === "fulfilled" ? (Array.isArray(result.value.data) ? result.value.data : []) : [],
-    );
-
-    // Sort by validFrom descending
     allEntries.sort((a: any, b: any) => {
       const aDate = a.validFrom ? Date.parse(a.validFrom) : 0;
       const bDate = b.validFrom ? Date.parse(b.validFrom) : 0;
