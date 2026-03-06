@@ -348,7 +348,7 @@ router.get("/employees/:externalId/history", async (req, res) => {
         const resolved = employeeTypeMap.get(Number(entry.value));
         if (resolved) return { ...entry, value: resolved };
       }
-      if (pathLower.includes("departmentid")) {
+      if (pathLower.includes("department")) {
         const resolved = departmentMap.get(Number(entry.value));
         if (resolved) return { ...entry, value: resolved };
       }
