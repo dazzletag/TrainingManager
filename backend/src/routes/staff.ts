@@ -167,7 +167,7 @@ router.get("/profile", async (req, res) => {
       role: person.role.name,
       homeLocation: person.homeLocation,
       dateOfBirth: plandayEmployee?.birthDate ?? plandayEmployee?.dateOfBirth ?? null,
-      hiredDate: plandayEmployee?.hiredDate ?? plandayEmployee?.startDate ?? plandayEmployee?.employedFrom ?? null,
+      hiredDate: plandayEmployee?.hiredFrom ?? plandayEmployee?.hiredDate ?? plandayEmployee?.startDate ?? plandayEmployee?.employedFrom ?? null,
     },
     requirements: dedupedRequirements,
   });
