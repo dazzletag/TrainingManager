@@ -240,6 +240,12 @@ export function fetchNextBestCourseEligible(courseId: string, role: string, emai
   });
 }
 
+export function fetchEmployeeWageHistory(externalId: string, role: string, email: string) {
+  return apiClient.get(`/staff/employees/${externalId}/wage-history`, {
+    headers: withHeaders(role, email),
+  });
+}
+
 export function fetchEmployeeHistory(
   externalId: string,
   role: string,

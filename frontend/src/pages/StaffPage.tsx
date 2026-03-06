@@ -24,7 +24,7 @@ import {
   ListItemText,
 } from "@mui/material";
 import { useUserContext } from "../context/UserContext";
-import { fetchStaffDirectory, fetchStaffProfile, submitEvidence, fetchEmployeeHistory } from "../services/api";
+import { fetchStaffDirectory, fetchStaffProfile, submitEvidence, fetchEmployeeHistory, fetchEmployeeWageHistory } from "../services/api";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 const formatDate = (value?: string | Date) =>
@@ -134,6 +134,13 @@ function StaffPage() {
     queryKey: ["employeeHistory", personExternalId],
     queryFn: () =>
       fetchEmployeeHistory(personExternalId!, role, userEmail).then((response) => response.data),
+    enabled: Boolean(personExternalId),
+  });
+
+  const { data: wageHistoryData, isFetching: isWageHistoryFetching } = useQuery({
+    queryKey: ["employeeWageHistory", personExternalId],
+    queryFn: () =>
+      fetchEmployeeWageHistory(personExternalId!, role, userEmail).then((response) => response.data),
     enabled: Boolean(personExternalId),
   });
 
@@ -497,6 +504,51 @@ function StaffPage() {
                   <TableCell>{friendlyPath(entry.path ?? "")}</TableCell>
                   <TableCell>{entry.value ?? "-"}</TableCell>
                   <TableCell sx={{ color: "text.secondary", fontSize: "0.75rem" }}>{entry.op}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Paper>
+
+      <Paper sx={{ p: 3, position: "relative" }}>
+        {isWageHistoryFetching && (
+          <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", bgcolor: "rgba(255,255,255,0.6)" }}>
+            <CircularProgress />
+          </Box>
+        )}
+        <Typography variant="h6">Wage History</Typography>
+        {!personExternalId && (
+          <Typography variant="body2" color="text.secondary" mt={1}>
+            Select a staff member to view their wage history.
+          </Typography>
+        )}
+        {wageHistoryData && (
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Valid From</TableCell>
+                <TableCell>Valid To</TableCell>
+                <TableCell>Wage Type</TableCell>
+                <TableCell align="right">Rate</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(wageHistoryData as any[]).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} sx={{ color: "text.secondary" }}>
+                    No wage history available.
+                  </TableCell>
+                </TableRow>
+              )}
+              {(wageHistoryData as any[]).map((entry: any, index: number) => (
+                <TableRow key={index}>
+                  <TableCell>{formatDate(entry.validFrom)}</TableCell>
+                  <TableCell>{entry.validTo ? formatDate(entry.validTo) : "Current"}</TableCell>
+                  <TableCell>{entry.wageType ?? "-"}</TableCell>
+                  <TableCell align="right">
+                    {entry.rate != null ? `£${Number(entry.rate).toFixed(2)}` : "-"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

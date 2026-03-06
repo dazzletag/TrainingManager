@@ -9,7 +9,7 @@ import { evaluateRequirement } from "../services/complianceService";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 import { dedupeRequirementCompliance } from "../services/requirementUtils";
-import { getPlandayHeaders, plandayHrClient } from "../services/plandaySync";
+import { getPlandayHeaders, plandayHrClient, plandayPayClient } from "../services/plandaySync";
 
 const router = Router();
 
@@ -318,6 +318,60 @@ async function getDepartmentMap(headers: Record<string, string>): Promise<Map<nu
   departmentsCachedAt = Date.now();
   return map;
 }
+
+router.get("/employees/:externalId/wage-history", async (req, res) => {
+  const { externalId } = req.params;
+
+  const personRepo = AppDataSource.getRepository(Person);
+  const person = await personRepo.findOne({
+    where: { externalId },
+    relations: { role: true, groups: true },
+  });
+
+  if (!person) {
+    return res.status(404).json({ message: "Person not found" });
+  }
+
+  try {
+    const headers = await getPlandayHeaders();
+    if (!headers.Authorization) {
+      return res.status(503).json({ message: "Planday integration not configured" });
+    }
+
+    // Collect all group externalIds (primary role + additional groups)
+    const groupExternalIds = Array.from(
+      new Set([
+        person.role?.externalId,
+        ...(person.groups?.map((g) => g.externalId) ?? []),
+      ].filter(Boolean)),
+    );
+
+    const results = await Promise.allSettled(
+      groupExternalIds.map((groupId) =>
+        plandayPayClient.get(
+          `/payrates/employeeGroups/${groupId}/employees/${externalId}/history`,
+          { headers },
+        ),
+      ),
+    );
+
+    const allEntries = results.flatMap((result) =>
+      result.status === "fulfilled" ? (result.value.data ?? []) : [],
+    );
+
+    // Sort by validFrom descending
+    allEntries.sort((a: any, b: any) => {
+      const aDate = a.validFrom ? Date.parse(a.validFrom) : 0;
+      const bDate = b.validFrom ? Date.parse(b.validFrom) : 0;
+      return bDate - aDate;
+    });
+
+    res.json(allEntries);
+  } catch (error: any) {
+    console.error("Planday wage history fetch failed", error);
+    res.status(500).json({ message: "Unable to fetch wage history" });
+  }
+});
 
 router.get("/employees/:externalId/history", async (req, res) => {
   const { externalId } = req.params;

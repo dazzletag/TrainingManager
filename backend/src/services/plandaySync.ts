@@ -61,6 +61,9 @@ export async function getPlandayHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+const plandayPayBaseUrl =
+  process.env.PLANDAY_PAY_API_URL ?? "https://openapi.planday.com/pay/v1.0";
+
 const hrClient = axios.create({
   baseURL: plandayHrBaseUrl,
   timeout: 15000,
@@ -71,7 +74,12 @@ const schedulingClient = axios.create({
   timeout: 15000,
 });
 
-export { hrClient as plandayHrClient, schedulingClient as plandaySchedulingClient };
+const payClient = axios.create({
+  baseURL: plandayPayBaseUrl,
+  timeout: 15000,
+});
+
+export { hrClient as plandayHrClient, schedulingClient as plandaySchedulingClient, payClient as plandayPayClient };
 
 interface PlandayEmployeeGroup {
   id: string;
