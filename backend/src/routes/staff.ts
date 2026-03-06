@@ -133,7 +133,24 @@ router.get("/profile", async (req, res) => {
   const assignmentMap = new Map(person.assignments?.map((assignment) => [assignment.requirement.id, assignment]));
   const requirementList = (person.assignments ?? []).map((assignment) => assignment.requirement);
   const groupIds = person.groups?.map((group) => group.id) ?? [];
-  const requirementMeta = await buildRequirementMetaMap(groupIds);
+
+  const [requirementMeta, plandayEmployee] = await Promise.all([
+    buildRequirementMetaMap(groupIds),
+    (async () => {
+      try {
+        const headers = await getPlandayHeaders();
+        if (!headers.Authorization) return null;
+        const response = await plandayHrClient.get(`/employees/${person.externalId}`, {
+          headers,
+          params: { special: "BirthDate" },
+        });
+        return response.data?.data ?? response.data ?? null;
+      } catch {
+        return null;
+      }
+    })(),
+  ]);
+
   const requirements = requirementList.map((requirement) =>
     evaluateRequirement(
       resolveRequirementMeta(requirement, requirementMeta.get(requirement.id)),
@@ -149,6 +166,8 @@ router.get("/profile", async (req, res) => {
       email: person.email,
       role: person.role.name,
       homeLocation: person.homeLocation,
+      dateOfBirth: plandayEmployee?.birthDate ?? plandayEmployee?.dateOfBirth ?? null,
+      hiredDate: plandayEmployee?.hiredDate ?? plandayEmployee?.startDate ?? plandayEmployee?.employedFrom ?? null,
     },
     requirements: dedupedRequirements,
   });

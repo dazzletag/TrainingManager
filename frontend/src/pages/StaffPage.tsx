@@ -265,6 +265,18 @@ function StaffPage() {
             <Typography variant="body2" color="text.secondary">
               {data.person.role} · {data.person.homeLocation}
             </Typography>
+            <Stack direction="row" spacing={3} mt={1}>
+              {data.person.dateOfBirth && (
+                <Typography variant="body2" color="text.secondary">
+                  Date of birth: <strong>{formatDate(data.person.dateOfBirth)}</strong>
+                </Typography>
+              )}
+              {data.person.hiredDate && (
+                <Typography variant="body2" color="text.secondary">
+                  Hired: <strong>{formatDate(data.person.hiredDate)}</strong>
+                </Typography>
+              )}
+            </Stack>
             <Divider sx={{ my: 2 }} />
             <Table size="small">
               <TableHead>
