@@ -24,11 +24,42 @@ import {
   ListItemText,
 } from "@mui/material";
 import { useUserContext } from "../context/UserContext";
-import { fetchStaffDirectory, fetchStaffProfile, submitEvidence } from "../services/api";
+import { fetchStaffDirectory, fetchStaffProfile, submitEvidence, fetchEmployeeHistory } from "../services/api";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 const formatDate = (value?: string | Date) =>
   value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+
+const formatDateTime = (value?: string) =>
+  value
+    ? new Date(value).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "-";
+
+const historyFieldLabels: Record<string, string> = {
+  "/salary": "Salary",
+  "/wage": "Wage",
+  "/pay": "Pay",
+  "/payCode": "Pay Code",
+  "/payType": "Pay Type",
+  "/jobTitle": "Job Title",
+  "/title": "Job Title",
+  "/position": "Position",
+  "/employeeGroupId": "Employee Group",
+  "/department": "Department",
+  "/contractRule": "Contract Rule",
+  "/employmentStatus": "Employment Status",
+  "/homeLocation": "Home Location",
+};
+
+function friendlyPath(path: string): string {
+  return historyFieldLabels[path] ?? path.replace(/^\//, "").replace(/([A-Z])/g, " $1").trim();
+}
 
 const statusColors: Record<string, "success" | "warning" | "error"> = {
   compliant: "success",
@@ -93,6 +124,13 @@ function StaffPage() {
     queryKey: ["staffProfile", personExternalId, role],
     queryFn: () =>
       fetchStaffProfile(personExternalId, role, userEmail).then((response) => response.data),
+    enabled: Boolean(personExternalId),
+  });
+
+  const { data: historyData, isFetching: isHistoryFetching } = useQuery({
+    queryKey: ["employeeHistory", personExternalId],
+    queryFn: () =>
+      fetchEmployeeHistory(personExternalId!, role, userEmail).then((response) => response.data),
     enabled: Boolean(personExternalId),
   });
 
@@ -406,6 +444,49 @@ function StaffPage() {
             </ListItem>
           )}
         </List>
+      </Paper>
+
+      <Paper sx={{ p: 3, position: "relative" }}>
+        {isHistoryFetching && (
+          <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", bgcolor: "rgba(255,255,255,0.6)" }}>
+            <CircularProgress />
+          </Box>
+        )}
+        <Typography variant="h6">Employment History</Typography>
+        {!personExternalId && (
+          <Typography variant="body2" color="text.secondary" mt={1}>
+            Select a staff member to view their history.
+          </Typography>
+        )}
+        {historyData && (
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Field</TableCell>
+                <TableCell>New Value</TableCell>
+                <TableCell>Operation</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(historyData.data ?? []).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} sx={{ color: "text.secondary" }}>
+                    No history available.
+                  </TableCell>
+                </TableRow>
+              )}
+              {(historyData.data ?? []).map((entry: any, index: number) => (
+                <TableRow key={index}>
+                  <TableCell>{formatDateTime(entry.modificationDateTime)}</TableCell>
+                  <TableCell>{friendlyPath(entry.path ?? "")}</TableCell>
+                  <TableCell>{entry.value ?? "-"}</TableCell>
+                  <TableCell sx={{ color: "text.secondary", fontSize: "0.75rem" }}>{entry.op}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Paper>
     </Stack>
   );

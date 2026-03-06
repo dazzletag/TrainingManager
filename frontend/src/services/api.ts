@@ -239,3 +239,15 @@ export function fetchNextBestCourseEligible(courseId: string, role: string, emai
     headers: withHeaders(role, email),
   });
 }
+
+export function fetchEmployeeHistory(
+  externalId: string,
+  role: string,
+  email: string,
+  params?: { startDateTime?: string; endDateTime?: string },
+) {
+  return apiClient.get(`/staff/employees/${externalId}/history`, {
+    headers: withHeaders(role, email),
+    params,
+  });
+}

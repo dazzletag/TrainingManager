@@ -9,6 +9,7 @@ import { evaluateRequirement } from "../services/complianceService";
 import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 import { dedupeRequirementCompliance } from "../services/requirementUtils";
+import { getPlandayHeaders, plandayHrClient } from "../services/plandaySync";
 
 const router = Router();
 
@@ -261,6 +262,35 @@ router.post("/:personId/evidence", async (req, res) => {
   });
 
   res.status(201).json({ evidence });
+});
+
+router.get("/employees/:externalId/history", async (req, res) => {
+  const { externalId } = req.params;
+  const { startDateTime, endDateTime, offset, limit } = req.query;
+
+  try {
+    const headers = await getPlandayHeaders();
+    if (!headers.Authorization) {
+      return res.status(503).json({ message: "Planday integration not configured" });
+    }
+
+    const params: Record<string, unknown> = { limit: limit ?? 50, offset: offset ?? 0 };
+    if (startDateTime) params.startDateTime = startDateTime;
+    if (endDateTime) params.endDateTime = endDateTime;
+
+    const response = await plandayHrClient.get(`/employees/${externalId}/history`, {
+      headers,
+      params,
+    });
+
+    res.json(response.data);
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      return res.status(404).json({ message: "Employee not found in Planday" });
+    }
+    console.error("Planday history fetch failed", error);
+    res.status(500).json({ message: "Unable to fetch employee history" });
+  }
 });
 
 export default router;
