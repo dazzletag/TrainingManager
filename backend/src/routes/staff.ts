@@ -264,13 +264,14 @@ router.post("/:personId/evidence", async (req, res) => {
   res.status(201).json({ evidence });
 });
 
+const LOOKUP_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 type EmployeeType = { id: number; name: string; description?: string };
 let cachedEmployeeTypes: Map<number, string> | null = null;
 let employeeTypesCachedAt = 0;
-const EMPLOYEE_TYPES_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 async function getEmployeeTypeMap(headers: Record<string, string>): Promise<Map<number, string>> {
-  if (cachedEmployeeTypes && Date.now() - employeeTypesCachedAt < EMPLOYEE_TYPES_TTL_MS) {
+  if (cachedEmployeeTypes && Date.now() - employeeTypesCachedAt < LOOKUP_TTL_MS) {
     return cachedEmployeeTypes;
   }
   const response = await plandayHrClient.get<{ data: EmployeeType[] }>("/employeetypes", { headers });
@@ -279,6 +280,23 @@ async function getEmployeeTypeMap(headers: Record<string, string>): Promise<Map<
   );
   cachedEmployeeTypes = map;
   employeeTypesCachedAt = Date.now();
+  return map;
+}
+
+type Department = { id: number; name: string; number?: string };
+let cachedDepartments: Map<number, string> | null = null;
+let departmentsCachedAt = 0;
+
+async function getDepartmentMap(headers: Record<string, string>): Promise<Map<number, string>> {
+  if (cachedDepartments && Date.now() - departmentsCachedAt < LOOKUP_TTL_MS) {
+    return cachedDepartments;
+  }
+  const response = await plandayHrClient.get<{ data: Department[] }>("/departments", { headers });
+  const map = new Map<number, string>(
+    (response.data.data ?? []).map((d) => [d.id, d.name]),
+  );
+  cachedDepartments = map;
+  departmentsCachedAt = Date.now();
   return map;
 }
 
@@ -296,22 +314,24 @@ router.get("/employees/:externalId/history", async (req, res) => {
     if (startDateTime) params.startDateTime = startDateTime;
     if (endDateTime) params.endDateTime = endDateTime;
 
-    const [historyResponse, employeeTypeMap] = await Promise.all([
+    const [historyResponse, employeeTypeMap, departmentMap] = await Promise.all([
       plandayHrClient.get(`/employees/${externalId}/history`, { headers, params }),
       getEmployeeTypeMap(headers),
+      getDepartmentMap(headers),
     ]);
 
     const data = (historyResponse.data.data ?? []).map((entry: any) => {
-      if (
-        typeof entry.path === "string" &&
-        entry.path.toLowerCase().includes("employeetypeid") &&
-        entry.value !== undefined &&
-        entry.value !== null
-      ) {
+      if (typeof entry.path !== "string" || entry.value === undefined || entry.value === null) {
+        return entry;
+      }
+      const pathLower = entry.path.toLowerCase();
+      if (pathLower.includes("employeetypeid")) {
         const resolved = employeeTypeMap.get(Number(entry.value));
-        if (resolved) {
-          return { ...entry, value: resolved };
-        }
+        if (resolved) return { ...entry, value: resolved };
+      }
+      if (pathLower.includes("departmentid")) {
+        const resolved = departmentMap.get(Number(entry.value));
+        if (resolved) return { ...entry, value: resolved };
       }
       return entry;
     });
