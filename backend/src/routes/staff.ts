@@ -229,7 +229,7 @@ router.post("/:personId/evidence", async (req, res) => {
     confidenceLevel,
   } = req.body;
 
-  if (!requirementId || !type || !source || !validFrom || !validTo || !uploadedFileKey || !verifiedBy) {
+  if (!requirementId || !type || !source || !validFrom || !validTo || !verifiedBy) {
     return res.status(400).json({ message: "Missing required evidence fields" });
   }
 

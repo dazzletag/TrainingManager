@@ -407,7 +407,7 @@ function StaffPage() {
             />
           </Box>
           <TextField
-            label="Uploaded File Key"
+            label="Uploaded File Key (optional)"
             value={form.uploadedFileKey}
             onChange={(event) => setForm((prev) => ({ ...prev, uploadedFileKey: event.target.value }))}
             size="small"

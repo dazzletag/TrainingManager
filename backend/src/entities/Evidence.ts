@@ -31,8 +31,8 @@ export class Evidence {
   @Column()
   validTo!: Date;
 
-  @Column()
-  uploadedFileKey!: string;
+  @Column({ nullable: true, default: null })
+  uploadedFileKey!: string | null;
 
   @Column()
   verifiedBy!: string;
