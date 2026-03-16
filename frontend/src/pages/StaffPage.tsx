@@ -444,7 +444,11 @@ function StaffPage() {
           >
             Submit Evidence
           </Button>
-          {mutation.isError && <Alert severity="error">Unable to create evidence</Alert>}
+          {mutation.isError && (
+            <Alert severity="error">
+              {(mutation.error as any)?.response?.data?.message ?? "Unable to create evidence"}
+            </Alert>
+          )}
           {mutation.isSuccess && <Alert severity="success">Evidence accepted</Alert>}
         </Stack>
       </Paper>

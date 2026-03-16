@@ -229,8 +229,11 @@ router.post("/:personId/evidence", async (req, res) => {
     confidenceLevel,
   } = req.body;
 
-  if (!requirementId || !type || !source || !validFrom || !validTo || !verifiedBy) {
-    return res.status(400).json({ message: "Missing required evidence fields" });
+  const missing = ["requirementId", "type", "source", "validFrom", "validTo", "verifiedBy"].filter(
+    (f) => !req.body[f],
+  );
+  if (missing.length > 0) {
+    return res.status(400).json({ message: `Missing required evidence fields: ${missing.join(", ")}` });
   }
 
   const personRepo = AppDataSource.getRepository(Person);
