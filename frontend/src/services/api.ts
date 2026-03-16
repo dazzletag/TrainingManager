@@ -46,6 +46,17 @@ export function submitEvidence(personId: string, payload: any, role: string, ema
   });
 }
 
+export function submitEvidenceWithFile(personId: string, formData: FormData, role: string, email: string) {
+  return apiClient.post(`/staff/${personId}/evidence/upload`, formData, {
+    headers: { ...withHeaders(role, email), "Content-Type": "multipart/form-data" },
+    timeout: 60000,
+  });
+}
+
+export function getEvidenceFileUrl(evidenceId: string) {
+  return `${BASE_URL}/staff/evidence/${evidenceId}/file`;
+}
+
 export function fetchManagerCompliance(role: string, email: string, requirementName?: string) {
   return apiClient.get("/manager/compliance", {
     headers: withHeaders(role, email),

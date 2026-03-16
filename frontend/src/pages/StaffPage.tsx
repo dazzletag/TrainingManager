@@ -24,7 +24,7 @@ import {
   ListItemText,
 } from "@mui/material";
 import { useUserContext } from "../context/UserContext";
-import { fetchStaffDirectory, fetchStaffProfile, submitEvidence, fetchEmployeeHistory, fetchEmployeeWageHistory } from "../services/api";
+import { fetchStaffDirectory, fetchStaffProfile, submitEvidenceWithFile, getEvidenceFileUrl, fetchEmployeeHistory, fetchEmployeeWageHistory } from "../services/api";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 const formatDate = (value?: string | Date) =>
@@ -96,11 +96,11 @@ function StaffPage() {
     source: "",
     validFrom: "",
     validTo: "",
-    uploadedFileKey: "",
     verifiedBy: userEmail,
     confidenceLevel: 80,
     requirementId: "",
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [homeFilter, setHomeFilter] = useState("all");
@@ -147,10 +147,22 @@ function StaffPage() {
   const personId = data?.person?.id;
 
   const mutation = useMutation({
-    mutationFn: (payload: any) => submitEvidence(personId!, payload, role, userEmail),
+    mutationFn: () => {
+      const fd = new FormData();
+      fd.append("requirementId", form.requirementId);
+      fd.append("source", form.source);
+      fd.append("validFrom", form.validFrom);
+      fd.append("validTo", form.validTo);
+      fd.append("verifiedBy", form.verifiedBy);
+      fd.append("confidenceLevel", String(form.confidenceLevel));
+      if (form.type) fd.append("type", form.type);
+      if (selectedFile) fd.append("file", selectedFile);
+      return submitEvidenceWithFile(personId!, fd, role, userEmail);
+    },
     onSuccess: () => {
       refetch();
-      setForm((prev) => ({ ...prev, type: "", source: "", uploadedFileKey: "", confidenceLevel: 80 }));
+      setForm((prev) => ({ ...prev, type: "", source: "", confidenceLevel: 80 }));
+      setSelectedFile(null);
     },
   });
 
@@ -406,12 +418,21 @@ function StaffPage() {
               size="small"
             />
           </Box>
-          <TextField
-            label="Uploaded File Key (optional)"
-            value={form.uploadedFileKey}
-            onChange={(event) => setForm((prev) => ({ ...prev, uploadedFileKey: event.target.value }))}
-            size="small"
-          />
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+              Attach certificate or document (optional)
+            </Typography>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+            />
+            {selectedFile && (
+              <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                {selectedFile.name}
+              </Typography>
+            )}
+          </Box>
           <TextField
             label="Verified By"
             value={form.verifiedBy}
@@ -429,18 +450,7 @@ function StaffPage() {
           <Button
             variant="contained"
             disabled={!personId || mutation.status === "pending"}
-            onClick={() => {
-              mutation.mutate({
-                requirementId: form.requirementId,
-                type: form.type,
-                source: form.source,
-                validFrom: form.validFrom,
-                validTo: form.validTo,
-                uploadedFileKey: form.uploadedFileKey,
-                verifiedBy: form.verifiedBy,
-                confidenceLevel: form.confidenceLevel,
-              });
-            }}
+            onClick={() => mutation.mutate()}
           >
             Submit Evidence
           </Button>
@@ -457,9 +467,24 @@ function StaffPage() {
         <Typography variant="h6">Evidence Ledger</Typography>
         <List dense>
           {evidenceList.map((item) => (
-            <ListItem key={item.id}>
+            <ListItem
+              key={item.id}
+              secondaryAction={
+                item.uploadedFileKey ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    href={getEvidenceFileUrl(item.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View
+                  </Button>
+                ) : null
+              }
+            >
               <ListItemText
-                primary={`${item.requirementName} · ${item.type}`}
+                primary={[item.requirementName, item.type].filter(Boolean).join(" · ")}
                 secondary={`Valid until ${formatDate(item.validTo)}`}
               />
             </ListItem>

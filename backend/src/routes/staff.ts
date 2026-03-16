@@ -10,6 +10,36 @@ import { logAudit } from "../services/auditLogger";
 import { In } from "typeorm";
 import { dedupeRequirementCompliance } from "../services/requirementUtils";
 import { getPlandayHeaders, plandayHrClient, plandayPayClient } from "../services/plandaySync";
+import { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } from "@azure/storage-blob";
+import multer from "multer";
+import crypto from "crypto";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+const STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
+const EVIDENCE_CONTAINER = "evidence-files";
+
+function getBlobServiceClient() {
+  return BlobServiceClient.fromConnectionString(STORAGE_CONNECTION_STRING);
+}
+
+async function generateSasUrl(blobName: string): Promise<string> {
+  const blobServiceClient = getBlobServiceClient();
+  const accountName = blobServiceClient.accountName;
+  const accountKey = STORAGE_CONNECTION_STRING.match(/AccountKey=([^;]+)/)?.[1] ?? "";
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  const expiresOn = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  const sasToken = generateBlobSASQueryParameters(
+    {
+      containerName: EVIDENCE_CONTAINER,
+      blobName,
+      permissions: BlobSASPermissions.parse("r"),
+      expiresOn,
+    },
+    sharedKeyCredential,
+  ).toString();
+  return `https://${accountName}.blob.core.windows.net/${EVIDENCE_CONTAINER}/${blobName}?${sasToken}`;
+}
 
 const router = Router();
 
@@ -229,7 +259,7 @@ router.post("/:personId/evidence", async (req, res) => {
     confidenceLevel,
   } = req.body;
 
-  const missing = ["requirementId", "type", "source", "validFrom", "validTo", "verifiedBy"].filter(
+  const missing = ["requirementId", "source", "validFrom", "validTo", "verifiedBy"].filter(
     (f) => !req.body[f],
   );
   if (missing.length > 0) {
@@ -284,6 +314,84 @@ router.post("/:personId/evidence", async (req, res) => {
   });
 
   res.status(201).json({ evidence });
+});
+
+// Upload evidence with optional file attachment
+router.post("/:personId/evidence/upload", upload.single("file"), async (req, res) => {
+  const personId = req.params.personId as string;
+  const { requirementId, type, source, validFrom, validTo, verifiedBy, confidenceLevel } = req.body;
+
+  const missing = ["requirementId", "source", "validFrom", "validTo", "verifiedBy"].filter(
+    (f) => !req.body[f],
+  );
+  if (missing.length > 0) {
+    return res.status(400).json({ message: `Missing required evidence fields: ${missing.join(", ")}` });
+  }
+
+  const personRepo = AppDataSource.getRepository(Person);
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const person = await personRepo.findOne({ where: { id: personId } });
+  const requirement = await requirementRepo.findOne({ where: { id: requirementId } });
+  if (!person || !requirement) {
+    return res.status(404).json({ message: "Person or requirement not found" });
+  }
+
+  const assignmentRepo = AppDataSource.getRepository(Assignment);
+  let assignment = await assignmentRepo.findOne({
+    where: { person: { id: personId }, requirement: { id: requirementId } },
+  });
+  if (!assignment) {
+    assignment = await assignmentRepo.save(assignmentRepo.create({ person, requirement }));
+  }
+
+  let uploadedFileKey: string | undefined;
+  if (req.file && STORAGE_CONNECTION_STRING) {
+    const ext = req.file.originalname.split(".").pop() ?? "bin";
+    const blobName = `${personId}/${crypto.randomUUID()}.${ext}`;
+    const blobServiceClient = getBlobServiceClient();
+    const containerClient = blobServiceClient.getContainerClient(EVIDENCE_CONTAINER);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    await blockBlobClient.uploadData(req.file.buffer, {
+      blobHTTPHeaders: { blobContentType: req.file.mimetype },
+    });
+    uploadedFileKey = blobName;
+  }
+
+  const evidenceRepo = AppDataSource.getRepository(Evidence);
+  const evidence = await evidenceRepo.save(
+    evidenceRepo.create({
+      assignment,
+      type: type || undefined,
+      source,
+      validFrom: new Date(validFrom),
+      validTo: new Date(validTo),
+      uploadedFileKey,
+      verifiedBy,
+      confidenceLevel: confidenceLevel ? Number(confidenceLevel) : 0,
+    }),
+  );
+
+  await logAudit({
+    who: req.user?.email ?? "system",
+    what: "evidence-upload",
+    why: `Evidence for ${requirement.name} by ${req.user?.email ?? "system"}`,
+  });
+
+  res.status(201).json({ evidence });
+});
+
+// Serve evidence file via short-lived SAS URL
+router.get("/evidence/:evidenceId/file", async (req, res) => {
+  const evidenceRepo = AppDataSource.getRepository(Evidence);
+  const evidence = await evidenceRepo.findOne({ where: { id: req.params.evidenceId } });
+  if (!evidence || !evidence.uploadedFileKey) {
+    return res.status(404).json({ message: "No file found for this evidence record" });
+  }
+  if (!STORAGE_CONNECTION_STRING) {
+    return res.status(503).json({ message: "Storage not configured" });
+  }
+  const sasUrl = await generateSasUrl(evidence.uploadedFileKey);
+  res.redirect(sasUrl);
 });
 
 const LOOKUP_TTL_MS = 60 * 60 * 1000; // 1 hour

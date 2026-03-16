@@ -19,8 +19,8 @@ export class Evidence {
   })
   assignment!: Assignment;
 
-  @Column()
-  type!: string;
+  @Column({ nullable: true, type: "nvarchar", length: 255, default: null })
+  type?: string;
 
   @Column()
   source!: string;
