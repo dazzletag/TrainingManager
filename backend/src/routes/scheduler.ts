@@ -221,6 +221,7 @@ async function buildSchedulerOverviewData(requirementId?: string): Promise<{ ove
         },
       },
     },
+    order: { day1: "ASC" },
   });
 
   const mandatoryAssignments = await assignmentRepo.find({
