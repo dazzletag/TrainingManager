@@ -12,7 +12,7 @@ import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { Assignment } from "../entities/Assignment";
 import { Evidence } from "../entities/Evidence";
 import { evaluateRequirement } from "../services/complianceService";
-import { assignToTrainingShift } from "../services/plandayScheduling";
+import { assignToTrainingShift, fetchMandatoryTrainingShifts } from "../services/plandayScheduling";
 import { In } from "typeorm";
 
 const router = Router();
@@ -453,6 +453,129 @@ router.post("/sessions", async (req, res) => {
   await repo.save(session);
 
   res.status(201).json({ session });
+});
+
+router.post("/sessions/import-planday", async (req, res) => {
+  try {
+    const shifts = await fetchMandatoryTrainingShifts();
+
+    if (!shifts.length) {
+      return res.json({ imported: [], totalShiftsFound: 0, message: "No future mandatory training shifts found in Planday" });
+    }
+
+    const shiftsByDate = new Map<string, typeof shifts>();
+    for (const shift of shifts) {
+      const existing = shiftsByDate.get(shift.date) ?? [];
+      existing.push(shift);
+      shiftsByDate.set(shift.date, existing);
+    }
+
+    const sortedDates = Array.from(shiftsByDate.keys()).sort();
+    const datePairs: Array<{ day1: string; day2: string; shifts: typeof shifts }> = [];
+
+    let i = 0;
+    while (i < sortedDates.length) {
+      const day1 = sortedDates[i];
+      const day1Shifts = shiftsByDate.get(day1) ?? [];
+
+      if (i + 1 < sortedDates.length) {
+        const day2 = sortedDates[i + 1];
+        const day2Shifts = shiftsByDate.get(day2) ?? [];
+        const daysBetween =
+          (new Date(day2).getTime() - new Date(day1).getTime()) / (1000 * 60 * 60 * 24);
+
+        if (daysBetween <= 14) {
+          datePairs.push({ day1, day2, shifts: [...day1Shifts, ...day2Shifts] });
+          i += 2;
+          continue;
+        }
+      }
+
+      datePairs.push({ day1, day2: day1, shifts: day1Shifts });
+      i += 1;
+    }
+
+    const sessionRepo = AppDataSource.getRepository(TrainingSession);
+    const assignmentRepo = AppDataSource.getRepository(SessionAssignment);
+    const personRepo = AppDataSource.getRepository(Person);
+
+    const imported = [];
+
+    for (const pair of datePairs) {
+      const sessionName = `Mandatory Training ${pair.day1}`;
+      const existingSession = await sessionRepo.findOne({ where: { name: sessionName } });
+
+      if (existingSession) {
+        imported.push({
+          sessionName,
+          day1: pair.day1,
+          day2: pair.day2,
+          skipped: true,
+          reason: "Session already exists with this name",
+          assignedCount: 0,
+        });
+        continue;
+      }
+
+      const day1Shifts = pair.shifts.filter((s) => s.date === pair.day1);
+      const day2Shifts = pair.shifts.filter((s) => s.date === pair.day2);
+      const sampleDay1 = day1Shifts[0] ?? pair.shifts[0];
+      const sampleDay2 = day2Shifts[0] ?? pair.shifts[0];
+
+      const session = await sessionRepo.save(
+        sessionRepo.create({
+          name: sessionName,
+          day1: new Date(pair.day1),
+          day2: new Date(pair.day2),
+          day1StartTime: sampleDay1.startTime,
+          day1EndTime: sampleDay1.endTime,
+          day2StartTime: sampleDay2.startTime,
+          day2EndTime: sampleDay2.endTime,
+          type: "Mandatory Training",
+        }),
+      );
+
+      const employeeIds = Array.from(new Set(pair.shifts.map((s) => s.employeeId)));
+      const persons = employeeIds.length
+        ? await personRepo.find({ where: { externalId: In(employeeIds) } })
+        : [];
+      const personByExternalId = new Map(persons.map((p) => [p.externalId, p]));
+
+      const assignmentsToSave: SessionAssignment[] = [];
+      let assignIndex = 0;
+
+      for (const employeeId of employeeIds) {
+        const person = personByExternalId.get(employeeId);
+        if (!person) continue;
+        assignIndex += 1;
+
+        for (const day of [1, 2]) {
+          const dropZoneId = `import-planday-${session.id}-${person.id}-${Date.now()}-${assignIndex}-day-${day}`;
+          assignmentsToSave.push(
+            assignmentRepo.create({ session, person, day, dropZoneId }),
+          );
+        }
+      }
+
+      if (assignmentsToSave.length) {
+        await assignmentRepo.save(assignmentsToSave);
+      }
+
+      imported.push({
+        sessionId: session.id,
+        sessionName: session.name,
+        day1: pair.day1,
+        day2: pair.day2,
+        skipped: false,
+        assignedCount: new Set(assignmentsToSave.map((a) => a.person.id)).size,
+      });
+    }
+
+    res.json({ imported, totalShiftsFound: shifts.length });
+  } catch (error) {
+    console.error("Failed to import Planday training shifts", error);
+    res.status(500).json({ message: "Failed to import shifts from Planday" });
+  }
 });
 
 router.post("/assign", async (req, res) => {

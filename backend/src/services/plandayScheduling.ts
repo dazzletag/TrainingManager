@@ -39,6 +39,7 @@ interface PlandayShift {
   endDateTime: string;
   date?: string;
   comment?: string;
+  employeeId?: string;
   punchClockShiftId?: string;
   status?: string;
   dateTimeCreated?: string;
@@ -319,6 +320,66 @@ function resolveTrainingPositionId(home?: string): string | undefined {
     default:
       return undefined;
   }
+}
+
+export async function fetchMandatoryTrainingShifts(): Promise<
+  Array<{
+    id: string;
+    date: string;
+    employeeId: string;
+    startTime: string;
+    endTime: string;
+    comment: string;
+  }>
+> {
+  const headers = await getPlandayHeaders();
+  if (!headers.Authorization) {
+    throw new Error("Planday access token unavailable");
+  }
+
+  const today = formatDateLocal(new Date());
+  const futureDate = new Date();
+  futureDate.setFullYear(futureDate.getFullYear() + 1);
+  const to = formatDateLocal(futureDate);
+
+  const allShifts: PlandayShift[] = [];
+  let offset = 0;
+  const limit = 50;
+
+  while (true) {
+    const response = await withRetry(() =>
+      plandaySchedulingClient.get<{ data: PlandayShift[]; paging?: { total: number } }>("/shifts", {
+        params: {
+          departmentId: trainingDepartmentId,
+          from: today,
+          to,
+          limit,
+          offset,
+        },
+        headers,
+      }),
+    );
+
+    const batch = response.data?.data ?? [];
+    allShifts.push(...batch);
+    if (batch.length < limit) break;
+    offset += limit;
+  }
+
+  return allShifts
+    .filter(
+      (shift) =>
+        shift.comment?.toLowerCase().includes("mandatory") && shift.employeeId,
+    )
+    .map((shift) => ({
+      id: String(shift.id),
+      date: getShiftDate(shift) ?? "",
+      employeeId: String(shift.employeeId),
+      startTime: shift.startDateTime?.split("T")[1]?.substring(0, 5) ?? "09:15",
+      endTime: shift.endDateTime?.split("T")[1]?.substring(0, 5) ?? "15:45",
+      comment: shift.comment ?? "",
+    }))
+    .filter((shift) => shift.date !== "");
 }
 
 export async function assignToTrainingShift(

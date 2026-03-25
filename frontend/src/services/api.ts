@@ -228,6 +228,17 @@ export function deleteTrainingSession(sessionId: string, role: string, email: st
   });
 }
 
+export function importPlandayShifts(role: string, email: string) {
+  return apiClient.post(
+    "/scheduler/sessions/import-planday",
+    {},
+    {
+      headers: withHeaders(role, email),
+      timeout: 60000,
+    },
+  );
+}
+
 export function recommendTrainingSession(sessionId: string, role: string, email: string) {
   return apiClient.post(
     `/scheduler/sessions/${sessionId}/recommend`,

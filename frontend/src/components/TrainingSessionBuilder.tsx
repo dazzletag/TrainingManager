@@ -24,6 +24,7 @@ import {
   recommendTrainingSession,
   markPersonUnavailable,
   removePersonUnavailable,
+  importPlandayShifts,
 } from "../services/api";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -591,6 +592,29 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
     },
   });
 
+  const [importFeedback, setImportFeedback] = useState<{
+    imported: Array<{
+      sessionName: string;
+      day1: string;
+      day2: string;
+      skipped: boolean;
+      reason?: string;
+      assignedCount: number;
+    }>;
+    totalShiftsFound: number;
+  } | null>(null);
+
+  const importMutation = useMutation({
+    mutationFn: () => importPlandayShifts(role, userEmail).then((response) => response.data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+      setImportFeedback(data);
+    },
+    onError: () => {
+      setImportFeedback(null);
+    },
+  });
+
   const homeColorMap = useMemo(() => {
     const map = new Map<string, string>();
     const homes = new Set<string>();
@@ -805,26 +829,68 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
               inputProps={{ step: 300 }}
             />
           </Stack>
-          <Button
-            variant="contained"
-            onClick={() => createSessionMutation.mutate(form)}
-            disabled={
-              !form.name ||
-              !form.day1 ||
-              !form.day2 ||
-              !form.day1StartTime ||
-              !form.day1EndTime ||
-              !form.day2StartTime ||
-              !form.day2EndTime ||
-              createSessionMutation.isPending
-            }
-          >
-            Create session
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="contained"
+              onClick={() => createSessionMutation.mutate(form)}
+              disabled={
+                !form.name ||
+                !form.day1 ||
+                !form.day2 ||
+                !form.day1StartTime ||
+                !form.day1EndTime ||
+                !form.day2StartTime ||
+                !form.day2EndTime ||
+                createSessionMutation.isPending
+              }
+            >
+              Create session
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => importMutation.mutate()}
+              disabled={importMutation.isPending}
+            >
+              {importMutation.isPending ? "Importing..." : "Import from Planday"}
+            </Button>
+          </Stack>
         </Stack>
         {createSessionMutation.isError && (
           <Alert severity="error" sx={{ mt: 2 }}>
             Unable to create session
+          </Alert>
+        )}
+        {importMutation.isError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Failed to import shifts from Planday
+          </Alert>
+        )}
+        {importFeedback && (
+          <Alert
+            severity={importFeedback.imported.length ? "success" : "info"}
+            sx={{ mt: 2 }}
+            onClose={() => setImportFeedback(null)}
+          >
+            {importFeedback.totalShiftsFound === 0 ? (
+              "No future mandatory training shifts found in Planday."
+            ) : (
+              <>
+                Found {importFeedback.totalShiftsFound} shift(s) in Planday.
+                {importFeedback.imported.map((entry, idx) => (
+                  <Box key={idx} sx={{ mt: 0.5 }}>
+                    {entry.skipped ? (
+                      <Typography variant="body2">
+                        Skipped {entry.sessionName}: {entry.reason}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2">
+                        Created {entry.sessionName} ({entry.day1} / {entry.day2}) with {entry.assignedCount} staff assigned
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </>
+            )}
           </Alert>
         )}
         {overviewQuery.isLoading && (
