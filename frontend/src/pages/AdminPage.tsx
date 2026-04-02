@@ -6,6 +6,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -227,10 +228,21 @@ function AdminPage() {
     enabled: tabIndex === 5,
   });
 
+  const [savedMappingIds, setSavedMappingIds] = useState<Set<string>>(new Set());
   const fieldMappingMutation = useMutation({
     mutationFn: ({ id, fieldIdentifier }: { id: string; fieldIdentifier: string | null }) =>
       updateTrainingRequirement(id, { fieldIdentifier }, role, userEmail),
-    onSuccess: () => trainingRequirementsQuery.refetch(),
+    onSuccess: (_data, variables) => {
+      trainingRequirementsQuery.refetch();
+      setSavedMappingIds((prev) => new Set(prev).add(variables.id));
+      setTimeout(() => {
+        setSavedMappingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.id);
+          return next;
+        });
+      }, 2000);
+    },
   });
 
   useEffect(() => {
@@ -922,6 +934,7 @@ function AdminPage() {
                   <TableCell>Training Requirement</TableCell>
                   <TableCell>Section</TableCell>
                   <TableCell>Planday Field</TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -929,6 +942,10 @@ function AdminPage() {
                   .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
                   .map((req: any) => {
                     const plandayFields = plandayFieldsQuery.data ?? [];
+                    // Only use stored fieldIdentifier if it actually matches a known Planday field
+                    const matchedValue = plandayFields.some((f: any) => f.id === req.fieldIdentifier)
+                      ? req.fieldIdentifier
+                      : "";
                     return (
                       <TableRow key={req.id}>
                         <TableCell>{req.name}</TableCell>
@@ -936,7 +953,7 @@ function AdminPage() {
                         <TableCell sx={{ minWidth: 280 }}>
                           <FormControl size="small" fullWidth>
                             <Select
-                              value={req.fieldIdentifier ?? ""}
+                              value={matchedValue}
                               displayEmpty
                               onChange={(event: SelectChangeEvent) => {
                                 const value = event.target.value || null;
@@ -956,13 +973,13 @@ function AdminPage() {
                                   )}
                                 </MenuItem>
                               ))}
-                              {req.fieldIdentifier && !plandayFields.some((f: any) => f.id === req.fieldIdentifier) && (
-                                <MenuItem value={req.fieldIdentifier}>
-                                  <em>{req.fieldIdentifier} (not in Planday)</em>
-                                </MenuItem>
-                              )}
                             </Select>
                           </FormControl>
+                        </TableCell>
+                        <TableCell sx={{ width: 60 }}>
+                          {savedMappingIds.has(req.id) && (
+                            <Chip label="Saved" size="small" color="success" />
+                          )}
                         </TableCell>
                       </TableRow>
                     );
