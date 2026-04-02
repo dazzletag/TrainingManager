@@ -28,17 +28,34 @@ router.get("/planday-fields", async (_req, res) => {
     if (!headers.Authorization) {
       return res.json({ fields: [] });
     }
-    const response = await plandayHrClient.get<{ data: Array<{ id: number; label?: string; name?: string; dataType?: string; fieldName?: string }> }>(
-      "/employees/customfields",
+
+    // Custom fields are embedded on individual employee records as custom_XXXXX: { name, type, value }.
+    // The bulk /employees endpoint strips them — fetch the first employee individually to harvest schema.
+    const listResponse = await plandayHrClient.get<{ data: Array<{ id: number }> }>(
+      "/employees",
+      { headers, params: { limit: 1 } },
+    );
+    const firstId = listResponse.data?.data?.[0]?.id;
+    if (!firstId) {
+      return res.json({ fields: [] });
+    }
+    const empResponse = await plandayHrClient.get<{ data: Record<string, any> }>(
+      `/employees/${firstId}`,
       { headers },
     );
-    const raw = response.data?.data ?? [];
-    const fields = raw.map((f) => ({
-      id: f.fieldName ?? `custom_${f.id}`,
-      name: f.label ?? f.name ?? f.fieldName ?? String(f.id),
-      dataType: f.dataType ?? "unknown",
-    }));
-    res.json({ fields });
+    const emp = empResponse.data?.data ?? {};
+    const seen = new Map<string, { id: string; name: string; dataType: string }>();
+    for (const [key, val] of Object.entries(emp)) {
+      if (!key.startsWith("custom_")) continue;
+      if (val && typeof val === "object" && "name" in val) {
+        seen.set(key, {
+          id: key,
+          name: String((val as any).name),
+          dataType: String((val as any).type ?? "unknown"),
+        });
+      }
+    }
+    res.json({ fields: Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name)) });
   } catch (error: any) {
     console.warn("Unable to fetch Planday custom fields", error?.response?.status, error?.message);
     res.json({ fields: [] });
