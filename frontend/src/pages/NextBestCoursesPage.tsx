@@ -153,7 +153,7 @@ function NextBestCoursesPage() {
             >
               <ToggleButton value="all">All</ToggleButton>
               <ToggleButton value="essential">Essential</ToggleButton>
-              <ToggleButton value="nice">Nice to have</ToggleButton>
+              <ToggleButton value="nice">Personal Development</ToggleButton>
               <ToggleButton value="home">Required for home</ToggleButton>
             </ToggleButtonGroup>
             <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ mt: 2 }}>

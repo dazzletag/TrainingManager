@@ -304,9 +304,7 @@ function resolveEmployeeGroupId(
     case "Glebe House":
       return "21753";
     case "Head Office":
-      // TODO: add Head Office scheduling group to Training dept (7770) in Planday,
-      // then set the group ID here
-      return undefined;
+      return "20391";
     default:
       return undefined;
   }

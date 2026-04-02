@@ -51,6 +51,7 @@ import {
   deleteAdminUser,
   fetchRecommendationSettings,
   updateRecommendationSettings,
+  fetchPlandayFields,
 } from "../services/api";
 import { useUserContext } from "../context/UserContext";
 import { useEffect, useState } from "react";
@@ -60,7 +61,7 @@ import CloseIcon from "@mui/icons-material/Close";
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
-  2: "Nice to have",
+  2: "Personal Development",
   3: "Home compliance",
 };
 
@@ -220,6 +221,18 @@ function AdminPage() {
     onSuccess: () => recommendationSettingsQuery.refetch(),
   });
 
+  const plandayFieldsQuery = useQuery({
+    queryKey: ["plandayFields", role],
+    queryFn: () => fetchPlandayFields(role, userEmail).then((response) => response.data.fields as Array<{ id: string; name: string; dataType: string }>),
+    enabled: tabIndex === 5,
+  });
+
+  const fieldMappingMutation = useMutation({
+    mutationFn: ({ id, fieldIdentifier }: { id: string; fieldIdentifier: string | null }) =>
+      updateTrainingRequirement(id, { fieldIdentifier }, role, userEmail),
+    onSuccess: () => trainingRequirementsQuery.refetch(),
+  });
+
   useEffect(() => {
     if (recommendationSettingsQuery.data?.settings) {
       const settings = recommendationSettingsQuery.data.settings;
@@ -350,6 +363,7 @@ function AdminPage() {
         <Tab label="Evidence Overrides" />
         <Tab label="Audit Trail" />
         <Tab label="Access" />
+        <Tab label="Field Mapping" />
       </Tabs>
 
       {tabIndex === 0 && (
@@ -885,6 +899,80 @@ function AdminPage() {
               </ListItem>
             )}
           </List>
+        </Box>
+      )}
+      {tabIndex === 5 && (
+        <Box mt={2}>
+          <Typography variant="subtitle1" gutterBottom>
+            Planday Field Mapping
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Map each training requirement to the corresponding Planday employee field. When a date is recorded against a mapped field in Planday, it can be used as evidence for that requirement.
+          </Typography>
+          {(trainingRequirementsQuery.isLoading || plandayFieldsQuery.isLoading) && <CircularProgress size={24} />}
+          {plandayFieldsQuery.isError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Unable to load Planday fields. Check that the Planday integration is configured.
+            </Alert>
+          )}
+          {!trainingRequirementsQuery.isLoading && !plandayFieldsQuery.isLoading && (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Training Requirement</TableCell>
+                  <TableCell>Section</TableCell>
+                  <TableCell>Planday Field</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {[...requirements]
+                  .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+                  .map((req: any) => {
+                    const plandayFields = plandayFieldsQuery.data ?? [];
+                    return (
+                      <TableRow key={req.id}>
+                        <TableCell>{req.name}</TableCell>
+                        <TableCell>{req.section ?? "Other"}</TableCell>
+                        <TableCell sx={{ minWidth: 280 }}>
+                          <FormControl size="small" fullWidth>
+                            <Select
+                              value={req.fieldIdentifier ?? ""}
+                              displayEmpty
+                              onChange={(event: SelectChangeEvent) => {
+                                const value = event.target.value || null;
+                                fieldMappingMutation.mutate({ id: req.id, fieldIdentifier: value });
+                              }}
+                            >
+                              <MenuItem value="">
+                                <em>Not mapped</em>
+                              </MenuItem>
+                              {plandayFields.map((field) => (
+                                <MenuItem key={field.id} value={field.id}>
+                                  {field.name}
+                                  {field.dataType && field.dataType !== "unknown" && (
+                                    <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                                      ({field.dataType})
+                                    </Typography>
+                                  )}
+                                </MenuItem>
+                              ))}
+                              {req.fieldIdentifier && !plandayFields.some((f: any) => f.id === req.fieldIdentifier) && (
+                                <MenuItem value={req.fieldIdentifier}>
+                                  <em>{req.fieldIdentifier} (not in Planday)</em>
+                                </MenuItem>
+                              )}
+                            </Select>
+                          </FormControl>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          )}
+          {fieldMappingMutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>Unable to save mapping</Alert>
+          )}
         </Box>
       )}
     </Paper>

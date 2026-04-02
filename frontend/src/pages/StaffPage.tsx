@@ -72,7 +72,7 @@ const statusColors: Record<string, "success" | "warning" | "error"> = {
 
 const requiredLevelLabels: Record<number, string> = {
   1: "Essential",
-  2: "Nice to have",
+  2: "Personal Development",
   3: "Home compliance",
 };
 
@@ -188,7 +188,7 @@ function StaffPage() {
 
     return [
       { label: "Essential", items: essential.sort(sortByName) },
-      { label: "Nice to have", items: nice.sort(sortByName) },
+      { label: "Personal Development", items: nice.sort(sortByName) },
       { label: "Home compliance", items: home.sort(sortByName) },
       { label: "Additional evidence", items: additional.sort(sortByName) },
       { label: "Other", items: other.sort(sortByName) },

@@ -13,12 +13,36 @@ import { Assignment } from "../entities/Assignment";
 import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
 import { TrainingRequirementSuppression } from "../entities/TrainingRequirementSuppression";
 import { isNextDueRequirement } from "../services/requirementUtils";
+import { getPlandayHeaders, plandayHrClient } from "../services/plandaySync";
 
 const router = Router();
 
 router.get("/roles", async (req, res) => {
   const roles = await AppDataSource.getRepository(Role).find();
   res.json({ roles });
+});
+
+router.get("/planday-fields", async (_req, res) => {
+  try {
+    const headers = await getPlandayHeaders();
+    if (!headers.Authorization) {
+      return res.json({ fields: [] });
+    }
+    const response = await plandayHrClient.get<{ data: Array<{ id: number; label?: string; name?: string; dataType?: string; fieldName?: string }> }>(
+      "/employees/customfields",
+      { headers },
+    );
+    const raw = response.data?.data ?? [];
+    const fields = raw.map((f) => ({
+      id: f.fieldName ?? `custom_${f.id}`,
+      name: f.label ?? f.name ?? f.fieldName ?? String(f.id),
+      dataType: f.dataType ?? "unknown",
+    }));
+    res.json({ fields });
+  } catch (error: any) {
+    console.warn("Unable to fetch Planday custom fields", error?.response?.status, error?.message);
+    res.json({ fields: [] });
+  }
 });
 
 const allowedAppRoles = new Set(["admin", "manager"]);
@@ -189,6 +213,7 @@ router.put("/training-requirements/:id", async (req, res) => {
     minimumAttendees,
     enabled,
     section,
+    fieldIdentifier,
   } = req.body;
 
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
@@ -208,6 +233,7 @@ router.put("/training-requirements/:id", async (req, res) => {
   if (importanceLevel !== undefined) requirement.importanceLevel = Number(importanceLevel);
   if (minimumAttendees !== undefined) requirement.minimumAttendees = Number(minimumAttendees);
   if (enabled !== undefined) requirement.enabled = Boolean(enabled);
+  if (fieldIdentifier !== undefined) requirement.fieldIdentifier = fieldIdentifier || null;
 
   if (Array.isArray(roleExternalIds)) {
     const roles = roleExternalIds.length
