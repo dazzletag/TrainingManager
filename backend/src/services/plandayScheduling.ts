@@ -1,6 +1,7 @@
 import { getPlandayHeaders, plandaySchedulingClient } from "./plandaySync";
 
-const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
+// trainingShiftNotePrefix reserved for future use
+// const trainingShiftNotePrefix = process.env.PLANDAY_TRAINING_SHIFT_NOTE_PREFIX ?? "Training Session";
 const trainingShiftStartHour = Number(process.env.PLANDAY_TRAINING_SHIFT_START_HOUR ?? 9);
 const trainingShiftEndHour = Number(process.env.PLANDAY_TRAINING_SHIFT_END_HOUR ?? 17);
 const trainingDepartmentId = process.env.PLANDAY_TRAINING_SHIFT_DEPARTMENT_ID ?? "7770";
@@ -259,9 +260,9 @@ async function unassignExistingShifts(
 async function createTrainingShift(
   externalId: string,
   window: ShiftWindow,
-  sessionName: string,
-  sessionId: string,
-  day: number,
+  _sessionName: string,
+  _sessionId: string,
+  _day: number,
   employeeGroupId?: string,
   positionId?: string,
 ): Promise<void> {
@@ -302,8 +303,12 @@ function resolveEmployeeGroupId(
       return "21755";
     case "Glebe House":
       return "21753";
+    case "Head Office":
+      // TODO: add Head Office scheduling group to Training dept (7770) in Planday,
+      // then set the group ID here
+      return undefined;
     default:
-      return "20395";
+      return undefined;
   }
 }
 

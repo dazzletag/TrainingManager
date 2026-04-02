@@ -38,13 +38,15 @@ function isExcludedPerson(person: Person) {
 function resolvePrimaryDepartmentId(home?: string): string | undefined {
   switch ((home ?? "").trim()) {
     case "Quarry House":
-      return "7653";
-    case "Beech House":
-      return "7655";
-    case "Field House":
-      return "7652";
-    case "Glebe House":
       return "7654";
+    case "Beech House":
+      return "7653";
+    case "Field House":
+      return "7655";
+    case "Glebe House":
+      return "7652";
+    case "Head Office":
+      return "6054";
     default:
       return undefined;
   }
