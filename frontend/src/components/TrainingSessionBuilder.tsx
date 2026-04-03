@@ -3,10 +3,20 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   InputAdornment,
   Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
   Chip,
@@ -25,6 +35,7 @@ import {
   markPersonUnavailable,
   removePersonUnavailable,
   importPlandayShifts,
+  saveSessionAttendance,
 } from "../services/api";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -615,6 +626,49 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
     },
   });
 
+  type AttendanceEntry = { personId: string; name: string; day1: boolean; day2: boolean };
+  const [attendanceSession, setAttendanceSession] = useState<SessionOverview | null>(null);
+  const [attendanceData, setAttendanceData] = useState<AttendanceEntry[]>([]);
+  const [attendanceConfirmOpen, setAttendanceConfirmOpen] = useState(false);
+  const [attendanceSaveResult, setAttendanceSaveResult] = useState<{ updated: string[]; plandayErrors: Array<{ name: string; error: string }> } | null>(null);
+
+  const openAttendanceDialog = (session: SessionOverview) => {
+    const personMap = new Map<string, AttendanceEntry>();
+    for (const a of session.day1Assignments) {
+      const entry = personMap.get(a.person.id) ?? { personId: a.person.id, name: a.person.name, day1: false, day2: false };
+      entry.day1 = true;
+      personMap.set(a.person.id, entry);
+    }
+    for (const a of session.day2Assignments) {
+      const entry = personMap.get(a.person.id) ?? { personId: a.person.id, name: a.person.name, day1: false, day2: false };
+      entry.day2 = true;
+      personMap.set(a.person.id, entry);
+    }
+    const sorted = Array.from(personMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    setAttendanceData(sorted);
+    setAttendanceSaveResult(null);
+    setAttendanceSession(session);
+  };
+
+  const attendanceMutation = useMutation({
+    mutationFn: ({ sessionId, attendance }: { sessionId: string; attendance: AttendanceEntry[] }) =>
+      saveSessionAttendance(sessionId, attendance, role, userEmail).then((r) => r.data),
+    onSuccess: (data) => {
+      setAttendanceSaveResult(data);
+      setAttendanceConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: overviewKey });
+    },
+  });
+
+  const handleAttendanceSave = () => {
+    const incomplete = attendanceData.filter((e) => !e.day1 || !e.day2);
+    if (incomplete.length > 0) {
+      setAttendanceConfirmOpen(true);
+    } else {
+      attendanceMutation.mutate({ sessionId: attendanceSession!.id, attendance: attendanceData });
+    }
+  };
+
   const homeColorMap = useMemo(() => {
     const map = new Map<string, string>();
     const homes = new Set<string>();
@@ -1163,6 +1217,13 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
                       >
                         Delete
                       </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => openAttendanceDialog(session)}
+                      >
+                        Attendance
+                      </Button>
                     </Stack>
 
                     {hasPublishError && (
@@ -1308,6 +1369,122 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
           </Box>
         </Box>
       </Paper>
+      {/* Attendance register dialog */}
+      <Dialog open={Boolean(attendanceSession)} onClose={() => setAttendanceSession(null)} fullWidth maxWidth="sm">
+        <DialogTitle>
+          Attendance Register — {attendanceSession?.name}
+          <Typography variant="body2" color="text.secondary">
+            {attendanceSession ? `Day 1: ${formatDate(attendanceSession.day1)} / Day 2: ${formatDate(attendanceSession.day2)}` : ""}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {attendanceSaveResult ? (
+            <Stack spacing={1}>
+              {attendanceSaveResult.updated.length > 0 && (
+                <Alert severity="success">
+                  Updated records for: {attendanceSaveResult.updated.join(", ")}
+                </Alert>
+              )}
+              {attendanceSaveResult.plandayErrors.length > 0 && (
+                <Alert severity="warning">
+                  Planday update failed for: {attendanceSaveResult.plandayErrors.map((e) => `${e.name} (${e.error})`).join("; ")}
+                </Alert>
+              )}
+            </Stack>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell align="center">Day 1</TableCell>
+                  <TableCell align="center">Day 2</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {attendanceData.map((entry) => (
+                  <TableRow key={entry.personId} sx={{ bgcolor: (!entry.day1 || !entry.day2) ? "warning.50" : undefined }}>
+                    <TableCell>{entry.name}</TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={entry.day1}
+                        onChange={(e) =>
+                          setAttendanceData((prev) =>
+                            prev.map((item) => item.personId === entry.personId ? { ...item, day1: e.target.checked } : item)
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={entry.day2}
+                        onChange={(e) =>
+                          setAttendanceData((prev) =>
+                            prev.map((item) => item.personId === entry.personId ? { ...item, day2: e.target.checked } : item)
+                          )
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!attendanceData.length && (
+                  <TableRow>
+                    <TableCell colSpan={3}>
+                      <Typography color="text.secondary">No attendees assigned to this session.</Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {attendanceMutation.isError && (
+            <Alert severity="error" sx={{ mt: 1 }}>Failed to save attendance records.</Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAttendanceSession(null)}>Close</Button>
+          {!attendanceSaveResult && (
+            <Button
+              variant="contained"
+              disabled={attendanceMutation.isPending || !attendanceData.length}
+              onClick={handleAttendanceSave}
+            >
+              {attendanceMutation.isPending ? "Saving..." : "Save attendance"}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation dialog for incomplete attendance */}
+      <Dialog open={attendanceConfirmOpen} onClose={() => setAttendanceConfirmOpen(false)} maxWidth="sm">
+        <DialogTitle>Incomplete attendance</DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom>
+            The following attendees have not completed both days and will NOT have their records updated:
+          </Typography>
+          <Stack component="ul" sx={{ mt: 1, pl: 2 }}>
+            {attendanceData.filter((e) => !e.day1 || !e.day2).map((e) => (
+              <li key={e.personId}>
+                <Typography variant="body2">
+                  {e.name} {!e.day1 && !e.day2 ? "(neither day)" : !e.day1 ? "(missed Day 1)" : "(missed Day 2)"}
+                </Typography>
+              </li>
+            ))}
+          </Stack>
+          <Typography sx={{ mt: 2 }}>
+            Only those who attended both days will have their Training Manager and Planday records updated. Is this correct?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAttendanceConfirmOpen(false)}>Go back</Button>
+          <Button
+            variant="contained"
+            disabled={attendanceMutation.isPending}
+            onClick={() => attendanceMutation.mutate({ sessionId: attendanceSession!.id, attendance: attendanceData })}
+          >
+            Confirm and save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

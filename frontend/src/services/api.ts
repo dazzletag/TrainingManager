@@ -274,6 +274,19 @@ export function fetchEmployeeWageHistory(externalId: string, role: string, email
   });
 }
 
+export function saveSessionAttendance(
+  sessionId: string,
+  attendance: Array<{ personId: string; day1: boolean; day2: boolean }>,
+  role: string,
+  email: string,
+) {
+  return apiClient.post(
+    `/scheduler/sessions/${sessionId}/attendance`,
+    { attendance },
+    { headers: withHeaders(role, email) },
+  );
+}
+
 export function fetchEmployeeHistory(
   externalId: string,
   role: string,

@@ -13,6 +13,7 @@ import { Assignment } from "../entities/Assignment";
 import { Evidence } from "../entities/Evidence";
 import { evaluateRequirement } from "../services/complianceService";
 import { assignToTrainingShift, fetchMandatoryTrainingShifts } from "../services/plandayScheduling";
+import { getPlandayHeaders, plandayHrClient } from "../services/plandaySync";
 import { In } from "typeorm";
 
 const router = Router();
@@ -838,6 +839,103 @@ router.post("/sessions/:sessionId/publish", async (req, res) => {
     console.error("Unable to publish session to Planday", error);
     res.status(500).json({ message: "Unable to publish session" });
   }
+});
+
+router.post("/sessions/:sessionId/attendance", async (req, res) => {
+  const { sessionId } = req.params;
+  const { attendance } = req.body as {
+    attendance: Array<{ personId: string; day1: boolean; day2: boolean }>;
+  };
+
+  if (!Array.isArray(attendance)) {
+    return res.status(400).json({ message: "attendance array is required" });
+  }
+
+  const sessionRepo = AppDataSource.getRepository(TrainingSession);
+  const personRepo = AppDataSource.getRepository(Person);
+  const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+  const assignmentRepo = AppDataSource.getRepository(Assignment);
+  const evidenceRepo = AppDataSource.getRepository(Evidence);
+
+  const session = await sessionRepo.findOneBy({ id: sessionId });
+  if (!session) {
+    return res.status(404).json({ message: "Session not found" });
+  }
+
+  // Find the requirement linked to mandatory training custom field, fall back to session type name
+  const requirement =
+    (await requirementRepo.findOne({ where: { fieldIdentifier: "custom_28191" } })) ??
+    (await requirementRepo.findOne({ where: { name: session.type } }));
+
+  const day1Date = new Date(session.day1);
+  const dueDate = new Date(day1Date);
+  dueDate.setFullYear(dueDate.getFullYear() + 1);
+  const dueDateString = dueDate.toISOString().split("T")[0];
+
+  const completedEntries = attendance.filter((entry) => entry.day1 && entry.day2);
+  const updated: string[] = [];
+  const plandayErrors: Array<{ name: string; error: string }> = [];
+
+  const headers = await getPlandayHeaders();
+
+  for (const entry of completedEntries) {
+    const person = await personRepo.findOneBy({ id: entry.personId });
+    if (!person) continue;
+
+    // Update Planday custom_28191 (Mandatory Training Due) to day1 + 1 year
+    if (headers.Authorization && person.externalId) {
+      try {
+        await plandayHrClient.put(
+          `/employees/${person.externalId}`,
+          { custom_28191: dueDateString },
+          { headers },
+        );
+      } catch (error: any) {
+        plandayErrors.push({
+          name: person.fullName,
+          error: error?.response?.data?.message ?? error?.message ?? "Unknown error",
+        });
+      }
+    }
+
+    // Update training manager evidence record
+    if (requirement) {
+      let trainingAssignment = await assignmentRepo.findOne({
+        where: { person: { id: person.id }, requirement: { id: requirement.id } },
+      });
+      if (!trainingAssignment) {
+        trainingAssignment = await assignmentRepo.save(
+          assignmentRepo.create({ person, requirement }),
+        );
+      }
+
+      const existing = await evidenceRepo.findOne({
+        where: { assignment: { id: trainingAssignment.id }, source: "attendance" },
+      });
+
+      if (existing) {
+        existing.validFrom = day1Date;
+        existing.validTo = dueDate;
+        await evidenceRepo.save(existing);
+      } else {
+        await evidenceRepo.save(
+          evidenceRepo.create({
+            assignment: trainingAssignment,
+            source: "attendance",
+            type: "attendance-register",
+            validFrom: day1Date,
+            validTo: dueDate,
+            verifiedBy: (req as any).user?.email ?? "attendance-register",
+            confidenceLevel: 100,
+          }),
+        );
+      }
+    }
+
+    updated.push(person.fullName);
+  }
+
+  res.json({ updated, plandayErrors });
 });
 
 export default router;
