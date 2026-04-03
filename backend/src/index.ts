@@ -37,6 +37,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 async function start(): Promise<void> {
   await AppDataSource.initialize();
+  await AppDataSource.runMigrations();
   app.listen(port, () => {
     console.log(`Backend listening on ${port}`);
   });
