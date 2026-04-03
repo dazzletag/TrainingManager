@@ -12,6 +12,7 @@ import { coerceRecommendationSettings, getRecommendationSettings } from "../serv
 import { Assignment } from "../entities/Assignment";
 import { TrainingRequirementSection } from "../entities/TrainingRequirementSection";
 import { TrainingRequirementSuppression } from "../entities/TrainingRequirementSuppression";
+import { TrainingRequirementGroup } from "../entities/TrainingRequirementGroup";
 import { isNextDueRequirement } from "../services/requirementUtils";
 import { getPlandayHeaders, plandayHrClient } from "../services/plandaySync";
 
@@ -30,31 +31,35 @@ router.get("/planday-fields", async (_req, res) => {
     }
 
     // Custom fields are embedded on individual employee records as custom_XXXXX: { name, type, value }.
-    // The bulk /employees endpoint strips them — fetch the first employee individually to harvest schema.
+    // The bulk /employees endpoint strips them — fetch several employees individually to build a
+    // complete union of all custom field definitions (not every employee has every field populated).
     const listResponse = await plandayHrClient.get<{ data: Array<{ id: number }> }>(
       "/employees",
-      { headers, params: { limit: 1 } },
+      { headers, params: { limit: 20 } },
     );
-    const firstId = listResponse.data?.data?.[0]?.id;
-    if (!firstId) {
+    const ids = (listResponse.data?.data ?? []).map((e) => e.id).slice(0, 20);
+    if (!ids.length) {
       return res.json({ fields: [] });
     }
-    const empResponse = await plandayHrClient.get<{ data: Record<string, any> }>(
-      `/employees/${firstId}`,
-      { headers },
-    );
-    const emp = empResponse.data?.data ?? {};
     const seen = new Map<string, { id: string; name: string; dataType: string }>();
-    for (const [key, val] of Object.entries(emp)) {
-      if (!key.startsWith("custom_")) continue;
-      if (val && typeof val === "object" && "name" in val) {
-        seen.set(key, {
-          id: key,
-          name: String((val as any).name),
-          dataType: String((val as any).type ?? "unknown"),
-        });
-      }
-    }
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const r = await plandayHrClient.get<{ data: Record<string, any> }>(`/employees/${id}`, { headers });
+          const emp = r.data?.data ?? {};
+          for (const [key, val] of Object.entries(emp)) {
+            if (!key.startsWith("custom_") || seen.has(key)) continue;
+            if (val && typeof val === "object" && "name" in val) {
+              seen.set(key, {
+                id: key,
+                name: String((val as any).name),
+                dataType: String((val as any).type ?? "unknown"),
+              });
+            }
+          }
+        } catch { /* skip individual failures */ }
+      }),
+    );
     res.json({ fields: Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name)) });
   } catch (error: any) {
     console.warn("Unable to fetch Planday custom fields", error?.response?.status, error?.message);
@@ -129,6 +134,7 @@ router.delete("/users/:id", async (req, res) => {
 router.get("/training-requirements", async (req, res) => {
   const repo = AppDataSource.getRepository(TrainingRequirement);
   const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
+  const groupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
   const suppressedEntries = await suppressionRepo.find();
   const suppressedNames = new Set(suppressedEntries.map((entry) => entry.name));
   const suppressedFieldIds = new Set(
@@ -140,7 +146,35 @@ router.get("/training-requirements", async (req, res) => {
       requirement.fieldIdentifier && suppressedFieldIds.has(requirement.fieldIdentifier);
     return !nameBlocked && !fieldBlocked && !isNextDueRequirement(requirement.name);
   });
-  res.json({ requirements });
+
+  const allGroups = await groupRepo.find({ relations: ["role"] });
+  const groupsByReqId = new Map<string, typeof allGroups>();
+  for (const group of allGroups) {
+    const arr = groupsByReqId.get(group.requirementId) ?? [];
+    arr.push(group);
+    groupsByReqId.set(group.requirementId, arr);
+  }
+
+  const enriched = requirements.map((req) => {
+    const groups = groupsByReqId.get(req.id) ?? [];
+    const roleLevels: Record<number, any[]> = { 1: [], 2: [], 3: [] };
+    if (groups.length > 0) {
+      for (const group of groups) {
+        if (group.role && roleLevels[group.requiredLevel] !== undefined) {
+          roleLevels[group.requiredLevel].push(group.role);
+        }
+      }
+    } else if (req.roles?.length) {
+      // Backwards compat: no group rows yet — put all roles at the requirement's current level
+      const level = (req as any).requiredLevel ?? 1;
+      if (roleLevels[level]) {
+        roleLevels[level] = req.roles as any[];
+      }
+    }
+    return { ...req, roleLevels };
+  });
+
+  res.json({ requirements: enriched });
 });
 
 router.get("/training-requirement-sections", async (_req, res) => {
@@ -173,6 +207,7 @@ router.post("/training-requirements", async (req, res) => {
     description,
     validityPeriodMonths,
     roleExternalIds,
+    roleLevels,
     requiredLevel,
     category,
     importanceLevel,
@@ -187,11 +222,18 @@ router.post("/training-requirements", async (req, res) => {
 
   const roleRepo = AppDataSource.getRepository(Role);
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
-  const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
+  const groupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
 
-  const roles = roleExternalIds?.length
-    ? await roleRepo.find({ where: { externalId: In(roleExternalIds) } })
-    : [];
+  // Build flat roles list from roleLevels or legacy roleExternalIds
+  let flatRoles: Role[] = [];
+  if (roleLevels && typeof roleLevels === "object") {
+    const allExternalIds = ([] as string[]).concat(...Object.values(roleLevels as Record<string, string[]>));
+    if (allExternalIds.length) {
+      flatRoles = await roleRepo.find({ where: { externalId: In(allExternalIds) } });
+    }
+  } else if (roleExternalIds?.length) {
+    flatRoles = await roleRepo.find({ where: { externalId: In(roleExternalIds) } });
+  }
 
   const requirement = requirementRepo.create({
     name,
@@ -202,11 +244,23 @@ router.post("/training-requirements", async (req, res) => {
     importanceLevel: importanceLevel ?? 3,
     minimumAttendees: minimumAttendees ?? 8,
     enabled: enabled ?? true,
-    roles,
+    roles: flatRoles,
     section: section || null,
   });
 
   await requirementRepo.save(requirement);
+
+  // Create TrainingRequirementGroup rows when roleLevels provided
+  if (roleLevels && typeof roleLevels === "object") {
+    for (const [levelStr, externalIds] of Object.entries(roleLevels as Record<string, string[]>)) {
+      const level = Number(levelStr);
+      if (!Array.isArray(externalIds) || !externalIds.length) continue;
+      const roles = await roleRepo.find({ where: { externalId: In(externalIds) } });
+      for (const role of roles) {
+        await groupRepo.save(groupRepo.create({ requirementId: requirement.id, roleId: role.id, requiredLevel: level }));
+      }
+    }
+  }
 
   await logAudit({
     who: req.user?.email ?? "system",
@@ -224,6 +278,7 @@ router.put("/training-requirements/:id", async (req, res) => {
     description,
     validityPeriodMonths,
     roleExternalIds,
+    roleLevels,
     requiredLevel,
     category,
     importanceLevel,
@@ -235,6 +290,7 @@ router.put("/training-requirements/:id", async (req, res) => {
 
   const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
   const roleRepo = AppDataSource.getRepository(Role);
+  const groupRepo = AppDataSource.getRepository(TrainingRequirementGroup);
   const suppressionRepo = AppDataSource.getRepository(TrainingRequirementSuppression);
 
   const requirement = await requirementRepo.findOne({ where: { id }, relations: ["roles"] });
@@ -252,7 +308,23 @@ router.put("/training-requirements/:id", async (req, res) => {
   if (enabled !== undefined) requirement.enabled = Boolean(enabled);
   if (fieldIdentifier !== undefined) requirement.fieldIdentifier = fieldIdentifier || null;
 
-  if (Array.isArray(roleExternalIds)) {
+  if (roleLevels && typeof roleLevels === "object") {
+    // Delete existing groups and rebuild from roleLevels
+    await groupRepo.delete({ requirementId: id });
+    const flatRoles: Role[] = [];
+    for (const [levelStr, externalIds] of Object.entries(roleLevels as Record<string, string[]>)) {
+      const level = Number(levelStr);
+      if (!Array.isArray(externalIds) || !externalIds.length) continue;
+      const roles = await roleRepo.find({ where: { externalId: In(externalIds) } });
+      flatRoles.push(...roles);
+      for (const role of roles) {
+        await groupRepo.save(groupRepo.create({ requirementId: id, roleId: role.id, requiredLevel: level }));
+      }
+    }
+    // Sync requirement.roles as union of all level roles
+    const unique = Array.from(new Map(flatRoles.map((r) => [r.id, r])).values());
+    requirement.roles = unique;
+  } else if (Array.isArray(roleExternalIds)) {
     const roles = roleExternalIds.length
       ? await roleRepo.find({ where: { externalId: In(roleExternalIds) } })
       : [];

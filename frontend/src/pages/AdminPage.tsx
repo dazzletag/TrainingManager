@@ -72,12 +72,11 @@ const getDefaultFormValues = () => ({
   name: "",
   description: "",
   validityPeriodMonths: 12,
-  requiredLevel: 1,
   category: "",
   importanceLevel: 3,
   minimumAttendees: 8,
   enabled: true,
-  roleExternalIds: [] as string[],
+  roleLevels: { 1: [] as string[], 2: [] as string[], 3: [] as string[] },
   section: defaultSections[2],
 });
 type FormValues = ReturnType<typeof getDefaultFormValues>;
@@ -256,13 +255,18 @@ function AdminPage() {
     }
   }, [recommendationSettingsQuery.data]);
 
-  const handleRoleSelection = (event: SelectChangeEvent<typeof formValues.roleExternalIds>) => {
+  const handleLevelRoleSelection = (level: 1 | 2 | 3) => (event: SelectChangeEvent<string[]>) => {
     const { value } = event.target;
+    const ids = typeof value === "string" ? value.split(",") : value;
     setFormValues((prev) => ({
       ...prev,
-      roleExternalIds: typeof value === "string" ? value.split(",") : value,
+      roleLevels: { ...prev.roleLevels, [level]: ids },
     }));
   };
+
+  const sortedRoles = [...(rolesQuery.data?.roles ?? [])].sort((a: any, b: any) =>
+    (a.name ?? "").localeCompare(b.name ?? ""),
+  );
 
   const requirements = trainingRequirementsQuery.data?.requirements ?? [];
   const sortedRequirements = [...requirements].sort((a: any, b: any) => {
@@ -434,12 +438,13 @@ function AdminPage() {
                       <TableRow>
                         <TableCell>{renderSortLabel("Name", "name")}</TableCell>
                         <TableCell>{renderSortLabel("Validity (months)", "validityPeriodMonths")}</TableCell>
-                        <TableCell>{renderSortLabel("Level", "requiredLevel")}</TableCell>
+                        <TableCell>Essential</TableCell>
+                        <TableCell>Personal Development</TableCell>
+                        <TableCell>Home Compliance</TableCell>
                         <TableCell>{renderSortLabel("Category", "category")}</TableCell>
                         <TableCell>{renderSortLabel("Importance", "importanceLevel")}</TableCell>
                         <TableCell>{renderSortLabel("Min attendees", "minimumAttendees")}</TableCell>
                         <TableCell>{renderSortLabel("Enabled", "enabled")}</TableCell>
-                        <TableCell>Roles</TableCell>
                         <TableCell />
                       </TableRow>
                     </TableHead>
@@ -448,14 +453,19 @@ function AdminPage() {
                         <TableRow key={requirement.id}>
                           <TableCell>{requirement.name}</TableCell>
                           <TableCell>{requirement.validityPeriodMonths}</TableCell>
-                          <TableCell>
-                            {requiredLevelLabels[requirement.requiredLevel] ?? requirement.requiredLevel ?? "-"}
+                          <TableCell sx={{ fontSize: "0.75rem" }}>
+                            {(requirement.roleLevels?.[1] ?? []).map((r: any) => r.name).join(", ") || "-"}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>
+                            {(requirement.roleLevels?.[2] ?? []).map((r: any) => r.name).join(", ") || "-"}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>
+                            {(requirement.roleLevels?.[3] ?? []).map((r: any) => r.name).join(", ") || "-"}
                           </TableCell>
                           <TableCell>{requirement.category ?? "-"}</TableCell>
                           <TableCell>{requirement.importanceLevel ?? "-"}</TableCell>
                           <TableCell>{requirement.minimumAttendees ?? "-"}</TableCell>
                           <TableCell>{requirement.enabled ? "Yes" : "No"}</TableCell>
-                          <TableCell>{requirement.roles.map((role: any) => role.name).join(", ")}</TableCell>
                           <TableCell>
                             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                               <Button
@@ -466,12 +476,15 @@ function AdminPage() {
                                     name: requirement.name ?? "",
                                     description: requirement.description ?? "",
                                     validityPeriodMonths: requirement.validityPeriodMonths ?? 12,
-                                    requiredLevel: requirement.requiredLevel ?? 1,
                                     category: requirement.category ?? "",
                                     importanceLevel: requirement.importanceLevel ?? 3,
                                     minimumAttendees: requirement.minimumAttendees ?? 8,
                                     enabled: requirement.enabled ?? true,
-                                    roleExternalIds: requirement.roles.map((role: any) => role.externalId),
+                                    roleLevels: {
+                                      1: (requirement.roleLevels?.[1] ?? []).map((r: any) => r.externalId),
+                                      2: (requirement.roleLevels?.[2] ?? []).map((r: any) => r.externalId),
+                                      3: (requirement.roleLevels?.[3] ?? []).map((r: any) => r.externalId),
+                                    },
                                     section: getSectionLabel(requirement),
                                   });
                                   setFormDialogOpen(true);
@@ -588,16 +601,33 @@ function AdminPage() {
                 setFormValues((prev) => ({ ...prev, validityPeriodMonths: Number(event.target.value) }))
               }
             />
-            <TextField
-              label="Required Level (1 essential, 2 nice to have, 3 home compliance)"
-              fullWidth
-              size="small"
-              type="number"
-              value={formValues.requiredLevel}
-              onChange={(event) =>
-                setFormValues((prev) => ({ ...prev, requiredLevel: Number(event.target.value) }))
-              }
-            />
+            <Box sx={{ gridColumn: "1 / -1", display: "grid", gap: 2, gridTemplateColumns: "repeat(3, 1fr)" }}>
+              {([1, 2, 3] as const).map((level) => (
+                <FormControl key={level} fullWidth size="small">
+                  <InputLabel>{requiredLevelLabels[level]}</InputLabel>
+                  <Select
+                    multiple
+                    label={requiredLevelLabels[level]}
+                    value={formValues.roleLevels[level]}
+                    onChange={handleLevelRoleSelection(level)}
+                    renderValue={(selected) =>
+                      selected.length
+                        ? sortedRoles
+                            .filter((r: any) => selected.includes(r.externalId))
+                            .map((r: any) => r.name)
+                            .join(", ")
+                        : "None"
+                    }
+                  >
+                    {sortedRoles.map((roleOption: any) => (
+                      <MenuItem key={roleOption.id} value={roleOption.externalId}>
+                        {roleOption.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              ))}
+            </Box>
             <TextField
               label="Importance level (1 low, 5 critical)"
               fullWidth
@@ -662,23 +692,6 @@ function AdminPage() {
               }
               label="Enabled for recommendations"
             />
-            <FormControl fullWidth size="small">
-              <Select
-                multiple
-                displayEmpty
-                value={formValues.roleExternalIds}
-                onChange={handleRoleSelection}
-                renderValue={(selected) =>
-                  selected.length ? selected.join(", ") : "Select roles (from Planday sync results)"
-                }
-              >
-                {rolesQuery.data?.roles.map((roleOption: any) => (
-                  <MenuItem key={roleOption.id} value={roleOption.externalId}>
-                    {roleOption.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -691,12 +704,11 @@ function AdminPage() {
                 name: formValues.name,
                 description: formValues.description,
                 validityPeriodMonths: formValues.validityPeriodMonths,
-                requiredLevel: formValues.requiredLevel,
                 category: formValues.category,
                 importanceLevel: formValues.importanceLevel,
                 minimumAttendees: formValues.minimumAttendees,
                 enabled: formValues.enabled,
-                roleExternalIds: formValues.roleExternalIds,
+                roleLevels: formValues.roleLevels,
                 section: formValues.section,
               };
               if (editingId) {
