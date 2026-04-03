@@ -175,7 +175,7 @@ function TrainingSessionBuilder({ requirementId, requirementName }: TrainingSess
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [pendingPersonIds, setPendingPersonIds] = useState<Set<string>>(new Set());
   const [mandatorySearch, setMandatorySearch] = useState("");
-  const [showAllMandatory, setShowAllMandatory] = useState(false);
+  const [showAllMandatory, setShowAllMandatory] = useState(true);
 
   const overviewQuery = useQuery({
     queryKey: overviewKey,
