@@ -2,6 +2,9 @@ import axios from "axios";
 import { AppDataSource } from "../db/data-source";
 import { Role } from "../entities/Role";
 import { Person } from "../entities/Person";
+import { TrainingRequirement } from "../entities/TrainingRequirement";
+import { Assignment } from "../entities/Assignment";
+import { Evidence } from "../entities/Evidence";
 
 const plandayRefreshToken = process.env.PLANDAY_REFRESH_TOKEN ?? process.env.PLANDAY_API_TOKEN;
 const plandayClientId = process.env.PLANDAY_CLIENT_ID;
@@ -115,6 +118,75 @@ function extractEmployeeGroupIds(employee: PlandayEmployee): string[] {
   return ids;
 }
 
+async function syncPlandayEvidenceForPerson(
+  person: Person,
+  employeeId: string,
+  headers: Record<string, string>,
+  mappedRequirements: TrainingRequirement[],
+): Promise<void> {
+  let empData: Record<string, any>;
+  try {
+    const r = await hrClient.get<{ data: Record<string, any> }>(`/employees/${employeeId}`, { headers });
+    empData = r.data?.data ?? {};
+  } catch {
+    return;
+  }
+
+  const assignmentRepo = AppDataSource.getRepository(Assignment);
+  const evidenceRepo = AppDataSource.getRepository(Evidence);
+
+  for (const requirement of mappedRequirements) {
+    const fieldId = requirement.fieldIdentifier!;
+    const fieldVal = empData[fieldId];
+    if (!fieldVal || typeof fieldVal !== "object") continue;
+
+    const rawDate = fieldVal.value;
+    if (!rawDate || typeof rawDate !== "string") continue;
+
+    const validFrom = new Date(rawDate);
+    if (isNaN(validFrom.getTime())) continue;
+
+    const validTo = new Date(validFrom);
+    validTo.setMonth(validTo.getMonth() + (requirement.validityPeriodMonths ?? 12));
+
+    // Find or create assignment
+    let assignment = await assignmentRepo.findOne({
+      where: { person: { id: person.id }, requirement: { id: requirement.id } },
+    });
+    if (!assignment) {
+      assignment = await assignmentRepo.save(
+        assignmentRepo.create({ person, requirement }),
+      );
+    }
+
+    // Find existing planday evidence for this assignment, update if date changed
+    const existing = await evidenceRepo.findOne({
+      where: { assignment: { id: assignment.id }, source: "planday" },
+    });
+
+    if (existing) {
+      const sameDate = existing.validFrom.toISOString().startsWith(rawDate);
+      if (!sameDate) {
+        existing.validFrom = validFrom;
+        existing.validTo = validTo;
+        await evidenceRepo.save(existing);
+      }
+    } else {
+      await evidenceRepo.save(
+        evidenceRepo.create({
+          assignment,
+          source: "planday",
+          type: "planday-sync",
+          validFrom,
+          validTo,
+          verifiedBy: "planday-sync",
+          confidenceLevel: 85,
+        }),
+      );
+    }
+  }
+}
+
 export async function syncPlandayData(): Promise<void> {
   if (!plandayRefreshToken || !plandayClientId) {
     console.warn("Planday refresh token or client id not configured, skipping sync");
@@ -156,6 +228,12 @@ export async function syncPlandayData(): Promise<void> {
       mappedRoles.set(roleExternalId, role);
     }
 
+    // Load requirements that have a Planday field mapping — used for evidence sync
+    const requirementRepo = AppDataSource.getRepository(TrainingRequirement);
+    const mappedRequirements = (await requirementRepo.find()).filter(
+      (r) => r.fieldIdentifier && r.fieldIdentifier.startsWith("custom_"),
+    );
+
     const employeeRepo = AppDataSource.getRepository(Person);
     for (const employee of employeesResponse.data.data) {
       const candidateRoles = extractEmployeeGroupIds(employee)
@@ -169,7 +247,7 @@ export async function syncPlandayData(): Promise<void> {
       }
 
       const existing = await employeeRepo.findOneBy({ externalId: String(employee.id) });
-      await employeeRepo.save(
+      const savedPerson = await employeeRepo.save(
         employeeRepo.create({
           id: existing?.id,
           externalId: String(employee.id),
@@ -181,6 +259,11 @@ export async function syncPlandayData(): Promise<void> {
           isActive: (employee.employmentStatus ?? "Active").toLowerCase() === "active",
         }),
       );
+
+      // Sync training evidence from mapped Planday custom fields
+      if (mappedRequirements.length > 0) {
+        await syncPlandayEvidenceForPerson(savedPerson, String(employee.id), headers, mappedRequirements);
+      }
     }
   } catch (error) {
     console.error("Planday sync failed", error);
