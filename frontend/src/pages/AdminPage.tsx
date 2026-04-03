@@ -264,9 +264,14 @@ function AdminPage() {
     }));
   };
 
-  const sortedRoles = [...(rolesQuery.data?.roles ?? [])].sort((a: any, b: any) =>
-    (a.name ?? "").localeCompare(b.name ?? ""),
-  );
+  const KNOWN_GROUP_IDS = new Set([
+    "21759", "21760", "20393", "20394", "20396", "20398", "21761",
+    "20397", "20399", "21758", "21762", "21756", "20392", "20400", "20401",
+  ]);
+
+  const sortedRoles = [...(rolesQuery.data?.roles ?? [])]
+    .filter((r: any) => KNOWN_GROUP_IDS.has(String(r.externalId)))
+    .sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? ""));
 
   const requirements = trainingRequirementsQuery.data?.requirements ?? [];
   const sortedRequirements = [...requirements].sort((a: any, b: any) => {
