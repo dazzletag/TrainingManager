@@ -1,0 +1,145 @@
+TrainingManager - Functionality Overview
+
+Summary
+- TrainingManager is a mandatory training and competency platform built on a React + TypeScript frontend, a Node/Express + TypeORM backend, Azure SQL for data, and Azure Functions for reporting. It integrates with Planday for HR data and scheduling updates, and supports Azure AD/Entra ID auth via MSAL on the frontend and JWT validation on the backend when enabled.
+
+Backend (API)
+- Runtime and base behavior
+  - Express app with CORS, Helmet, JSON body parsing, and a /health check.
+  - Uses TypeORM with Azure SQL; runs initial Planday sync on startup and continues on a configurable interval (PLANDAY_SYNC_INTERVAL_MS, default 30 min).
+  - Auth is either mock headers (x-user-*) or Azure AD JWT validation + mapping (AZURE_AUTH_ENABLED, AZURE_TENANT_ID, AZURE_CLIENT_ID).
+
+- Core domain entities
+  - Person: employee profile (externalId, full name, email, employmentStatus, homeLocation, isActive), primary role, and group memberships.
+  - Role: role catalog (externalId, name, category, description) with training requirement links.
+  - TrainingRequirement: course definition (name, description, validityPeriodMonths, requiredLevel, importanceLevel, minimumAttendees, enabled, category, section, fieldIdentifier) with linked roles.
+  - TrainingRequirementGroup: many-to-many requirement ↔ role group link with requiredLevel override.
+  - Assignment: person ↔ requirement link; completion is inferred from Evidence.
+  - Evidence: proof of completion (type, source, validFrom/validTo, uploadedFileKey, verifiedBy, confidenceLevel).
+  - AuditLog: who/what/when/why for key operations.
+  - TrainingSession and SessionAssignment: two-day session plans and drag/drop assignments.
+  - TrainingUnavailability: marks a person unavailable for scheduling.
+  - AppUser: admin/manager access control via email.
+  - RecommendationSettings: settings for “Next Best Courses” scoring.
+
+- Compliance logic
+  - Evidence-first compliance: a requirement is compliant if there is evidence with validTo > now.
+  - At-risk when expiry is within 30 days, missing when there is no valid evidence.
+  - Dedupes “Next Due” requirement variants by normalizing name and preferring non “Next Due” entries.
+
+- Staff endpoints
+  - Staff directory with search/home filters and optional list of homes.
+  - Staff profile and requirements by externalId or personId with compliance evaluation and deduping.
+  - Evidence upload endpoint that creates assignments if missing and writes audit log entries.
+
+- Manager endpoints
+  - Compliance summary grouped by home and role, with optional filter by a single course name.
+  - At-risk list of staff requiring attention, with optional single-course filter.
+  - Evidence ledger for a specific person.
+
+- Admin endpoints
+  - Roles list from Planday sync.
+  - User access management (admin/manager) and auto-bootstrap of first admin based on calling email.
+  - Training requirements CRUD, with suppression logic to hide deleted or unwanted fieldIdentifiers/names.
+  - Requirement sections CRUD to organize training lists.
+  - Evidence override/approval endpoint that adjusts confidence/verifiedBy and logs audit entries.
+  - Audit trail retrieval.
+  - Recommendation settings retrieval and update.
+
+- Scheduler endpoints
+  - Overview data: session list with assignments, unassigned candidates, and unavailable list.
+  - Session creation and deletion.
+  - Assignment creation/move with two-day drop zones; remove assignment.
+  - Mark unavailable and remove unavailable.
+  - Recommend attendees (per session) using a Python helper; falls back to simple date sort if script fails.
+  - Publish sessions to Planday: removes conflicting shifts, respects holiday/absence, then creates a training shift.
+
+- Planday integration
+  - HR sync (roles + employees) from Planday HR API using refresh-token auth. Updates role/employee data in Azure SQL.
+  - Scheduling integration updates Planday shifts: unassign existing shifts, skip holidays, and create a training shift with home-specific group/position mapping.
+
+- Recommendations (Next Best Courses)
+  - SQL-based scoring of courses using vw_employee_training_status:
+    - risk weighting (expired and at-risk counts), importance multiplier, and minimum cohort size gate.
+    - filters out specific course names and categories like SCTV, Competency, Induction, flu, fire drill, and mandatory training.
+  - Provides totals of at-risk + expired staff for recommended courses.
+  - Provides eligible staff list (expired/at-risk) per course.
+
+Frontend (UI)
+- Auth and app shell
+  - MSAL authentication (Azure AD/Entra ID) with redirect flow.
+  - Role-aware layout, navigation, and sign-out.
+  - UserContext fetches the current user role from the backend and sets a demo person external ID for staff views.
+
+- Staff experience
+  - Directory search with home filtering and selection of a staff member.
+  - Compliance snapshot table with categories by required level, expiry timeline, and evidence count.
+  - Evidence upload form (requirement ID, validity range, confidence) with success/failure feedback.
+  - Evidence ledger list.
+
+- Manager experience
+  - Compliance overview summary by home for Mandatory Training.
+  - Training Session Builder:
+    - Drag-and-drop session assignment for two-day sessions.
+    - Unassigned pool, unavailable list, and in-session cards with home-based color coding.
+    - Session create/delete, recommend, and publish to Planday.
+    - Optimistic UI updates for drag/drop actions.
+
+- Admin experience
+  - Requirements management with sections, search/sort, and full CRUD.
+  - Recommendation settings editor (at-risk window, minimum attendees, importance multiplier).
+  - Evidence override actions for at-risk staff.
+  - Audit trail view.
+  - Admin/manager access management.
+
+- Next Best Courses experience
+  - Ranked course recommendations with urgency indicators, risk/volume/importance breakdown, and “eligible staff” modal.
+  - Filters by required level (Essential / Nice to have / Home compliance).
+
+- Reporting & Insights (admin only)
+  - KPI tiles, charts, heatmaps, and filters for home/role/importance/course keywords.
+  - Integrates with reporting Azure Functions for summary, compliance breakdown, forecast, utilisation, and SCTV matrix.
+
+Reporting (Azure Functions)
+- Shared database module parses SQL connection settings and queries Azure SQL.
+- Filter utilities convert query params (home/roles/importance/course keywords) into SQL where clauses.
+- Summary endpoint
+  - KPIs: compliance rate, overdue counts, due-30/60/90, avg days late.
+  - Risk by home, forecast (next 3 months), velocity (12 months), bottlenecks, distributions, and repeat attendance.
+- Compliance endpoint
+  - Breakdown by home, role, and course for essential training.
+- Forecast endpoint
+  - Due/overdue by month and by home for near-term horizon.
+- Utilisation endpoint
+  - Session utilisation values from vw_training_sessions_utilisation.
+- Matrix endpoint
+  - Essential SCTV expiry matrix by employee and course.
+
+Automation and Utilities
+- Planday import job (staffdetails.py)
+  - Reads a training matrix (xlsx) mapping Planday employee groups to training requirements.
+  - Creates or updates roles, requirements, assignments, and evidence based on Planday custom fields.
+  - Handles “Next Due” fields, one-off training, validity overrides, and audit logging.
+  - Applies suppression list to skip unwanted requirements.
+
+- Automation runbook and container job
+  - run_planday_import.py and planday_import_runbook.py pull secrets from Azure Key Vault via managed identity and run staffdetails.py.
+  - Dockerfile builds a Python image with ODBC drivers and dependencies to run the import in a container job.
+
+- Data utilities
+  - mergeNextDueRequirements.js merges “Next Due” requirement variants into base requirements and consolidates assignments/evidence.
+
+Infrastructure (Bicep)
+- Provisions Azure SQL server/database, firewall rule, App Service plan, Web App (backend), and Key Vault.
+- Enables managed identity for the Web App and grants Key Vault read access for secrets.
+
+Key configuration
+- Backend: DB_* for SQL, PLANDAY_* for API access, AZURE_* for JWT validation.
+- Frontend: VITE_API_BASE_URL for API, VITE_REPORTING_BASE_URL for reporting functions, VITE_AZURE_* for MSAL.
+
+End-to-end flow (high level)
+- Planday HR data syncs into Roles and People.
+- Training requirements and assignments define compliance scope; Evidence determines compliance status.
+- Managers plan training sessions and publish to Planday, which updates shift assignments.
+- Admins manage requirements, access, evidence overrides, and recommendation settings.
+- Reporting functions surface compliance intelligence for admins.
