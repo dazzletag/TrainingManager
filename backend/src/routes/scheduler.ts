@@ -217,25 +217,26 @@ async function buildSchedulerOverviewData(requirementId?: string): Promise<{ ove
     relations: {
       assignments: {
         person: {
+          role: true,
           groups: true,
-          assignments: {
-            evidence: true,
-          },
         },
       },
     },
+    loadEagerRelations: false,
     order: { day1: "ASC" },
   });
 
   const mandatoryAssignments = await assignmentRepo.find({
     where: { requirement: { id: mandatoryRequirement.id } },
-    relations: { evidence: true },
+    relations: { evidence: true, person: true },
+    loadEagerRelations: false,
   });
   const personIds = Array.from(new Set(mandatoryAssignments.map((assignment) => assignment.person.id)));
   const personList = personIds.length
     ? await personRepo.find({
         where: { id: In(personIds) },
         relations: { role: true, groups: true },
+        loadEagerRelations: false,
       })
     : [];
   const filteredPersonList = personList.filter((person) => !isExcludedPerson(person));
@@ -246,6 +247,7 @@ async function buildSchedulerOverviewData(requirementId?: string): Promise<{ ove
         groups: true,
       },
     },
+    loadEagerRelations: false,
   });
   const unavailableIds = new Set(
     unavailabilityEntries
