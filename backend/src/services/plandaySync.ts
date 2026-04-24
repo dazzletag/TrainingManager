@@ -235,6 +235,8 @@ export async function syncPlandayData(): Promise<void> {
     );
 
     const employeeRepo = AppDataSource.getRepository(Person);
+    const evidenceSyncQueue: Array<{ person: Person; employeeId: string }> = [];
+
     for (const employee of employeesResponse.data.data) {
       const candidateRoles = extractEmployeeGroupIds(employee)
         .map((groupId) => mappedRoles.get(groupId))
@@ -260,11 +262,22 @@ export async function syncPlandayData(): Promise<void> {
         }),
       );
 
-      // Sync training evidence from mapped Planday custom fields (fire-and-forget to avoid blocking)
       if (mappedRequirements.length > 0) {
-        syncPlandayEvidenceForPerson(savedPerson, String(employee.id), headers, mappedRequirements)
-          .catch((err) => console.error(`Evidence sync failed for ${savedPerson.fullName}:`, err));
+        evidenceSyncQueue.push({ person: savedPerson, employeeId: String(employee.id) });
       }
+    }
+
+    // Run evidence syncs sequentially in the background after main loop, 500ms apart
+    if (evidenceSyncQueue.length > 0) {
+      (async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5000)); // wait 5s for server to settle
+        for (const { person, employeeId } of evidenceSyncQueue) {
+          await syncPlandayEvidenceForPerson(person, employeeId, headers, mappedRequirements)
+            .catch((err) => console.error(`Evidence sync failed for ${person.fullName}:`, err));
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        console.log(`Evidence sync complete for ${evidenceSyncQueue.length} employees`);
+      })();
     }
   } catch (error) {
     console.error("Planday sync failed", error);
