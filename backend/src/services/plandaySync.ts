@@ -152,6 +152,7 @@ async function syncPlandayEvidenceForPerson(
     // Find or create assignment
     let assignment = await assignmentRepo.findOne({
       where: { person: { id: person.id }, requirement: { id: requirement.id } },
+      loadEagerRelations: false,
     });
     if (!assignment) {
       assignment = await assignmentRepo.save(
@@ -162,6 +163,7 @@ async function syncPlandayEvidenceForPerson(
     // Find existing planday evidence for this assignment, update if date changed
     const existing = await evidenceRepo.findOne({
       where: { assignment: { id: assignment.id }, source: "planday" },
+      loadEagerRelations: false,
     });
 
     if (existing) {
@@ -248,7 +250,7 @@ export async function syncPlandayData(): Promise<void> {
         continue;
       }
 
-      const existing = await employeeRepo.findOneBy({ externalId: String(employee.id) });
+      const existing = await employeeRepo.findOne({ where: { externalId: String(employee.id) }, loadEagerRelations: false });
       const savedPerson = await employeeRepo.save(
         employeeRepo.create({
           id: existing?.id,
