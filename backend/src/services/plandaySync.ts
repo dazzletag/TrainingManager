@@ -260,9 +260,10 @@ export async function syncPlandayData(): Promise<void> {
         }),
       );
 
-      // Sync training evidence from mapped Planday custom fields
+      // Sync training evidence from mapped Planday custom fields (fire-and-forget to avoid blocking)
       if (mappedRequirements.length > 0) {
-        await syncPlandayEvidenceForPerson(savedPerson, String(employee.id), headers, mappedRequirements);
+        syncPlandayEvidenceForPerson(savedPerson, String(employee.id), headers, mappedRequirements)
+          .catch((err) => console.error(`Evidence sync failed for ${savedPerson.fullName}:`, err));
       }
     }
   } catch (error) {
